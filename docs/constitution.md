@@ -173,4 +173,5 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 | 버전 | 문서 위치 | 설명 |
 |------|----------|------|
 | v1.0 | `docs/v1.0/daegu_constitution.md` | Spec 주도 개발(SDD)에서 최초 생성된 Constitution |
+| v1.1 | `docs/constitution.md` | #1 ~ #6까지 constitution에 반영 | 
 
