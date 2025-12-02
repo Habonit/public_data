@@ -310,8 +310,21 @@ def create_folium_map(
     Returns:
         folium.Map: Map object ready for rendering
     """
+    # Default center: Daegu city center
+    DAEGU_CENTER_LAT = 35.8714
+    DAEGU_CENTER_LNG = 128.6014
+
     # Drop rows with missing coordinates
     df_clean = df.dropna(subset=[lat_col, lng_col]).copy()
+
+    # Early return with default Daegu center map if no valid coordinates
+    if len(df_clean) == 0:
+        m = folium.Map(
+            location=[DAEGU_CENTER_LAT, DAEGU_CENTER_LNG],
+            zoom_start=12,
+            tiles='OpenStreetMap'
+        )
+        return m
 
     # Sample to 5000 points if dataset larger (for performance)
     if len(df_clean) > 5000:
@@ -353,17 +366,17 @@ def create_folium_map(
     else:
         marker_container = feature_group
 
-    # Add markers
-    for idx, row in df_clean.iterrows():
-        lat = row[lat_col]
-        lng = row[lng_col]
+    # T043: Optimized with itertuples for better performance
+    for row in df_clean.itertuples(index=False):
+        lat = getattr(row, lat_col)
+        lng = getattr(row, lng_col)
 
         # Create popup content
         if popup_cols:
             popup_html = "<div style='width: 200px'>"
             for col in popup_cols:
-                if col in row:
-                    popup_html += f"<b>{col}:</b> {row[col]}<br>"
+                if hasattr(row, col):
+                    popup_html += f"<b>{col}:</b> {getattr(row, col)}<br>"
             popup_html += "</div>"
         else:
             popup_html = f"<b>Location:</b> ({lat:.4f}, {lng:.4f})"
@@ -471,17 +484,17 @@ def create_overlay_map(datasets: list[dict]) -> folium.Map:
         else:
             marker_container = feature_group
 
-        # Add markers
-        for idx, row in df_clean.iterrows():
-            lat = row[lat_col]
-            lng = row[lng_col]
+        # T044: Optimized with itertuples for better performance
+        for row in df_clean.itertuples(index=False):
+            lat = getattr(row, lat_col)
+            lng = getattr(row, lng_col)
 
             # Create popup
             if popup_cols:
                 popup_html = f"<div style='width: 200px'><b>Dataset:</b> {name}<br>"
                 for col in popup_cols:
-                    if col in row:
-                        popup_html += f"<b>{col}:</b> {row[col]}<br>"
+                    if hasattr(row, col):
+                        popup_html += f"<b>{col}:</b> {getattr(row, col)}<br>"
                 popup_html += "</div>"
             else:
                 popup_html = f"<b>{name}</b><br>({lat:.4f}, {lng:.4f})"
