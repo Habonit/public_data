@@ -1,8 +1,15 @@
 """
 Data analysis tools for Tool Calling in Claude chatbot.
 
-이 모듈은 Claude API의 Tool Use 기능을 위한 15개 데이터 분석 도구를 정의합니다.
+이 모듈은 Claude API의 Tool Use 기능을 위한 20개 데이터 분석 도구를 정의합니다.
 각 도구는 pandas DataFrame을 분석하여 결과를 문자열로 반환합니다.
+
+v1.1.2: 5개 추가 도구
+- analyze_missing_pattern: 결측값 패턴 분석 (MCAR, MAR, MNAR)
+- get_column_correlation_with_target: 타겟 컬럼과의 상관관계 분석
+- detect_data_types: 컬럼별 실제 데이터 타입 추론
+- get_temporal_pattern: 시간 관련 컬럼의 패턴 분석
+- summarize_categorical_distribution: 범주형 컬럼 분포 요약
 """
 import pandas as pd
 import numpy as np
@@ -262,6 +269,72 @@ TOOLS = [
                 }
             },
             "required": ["row_column", "col_column"]
+        }
+    },
+    # v1.1.2: 5개 추가 분석 도구
+    {
+        "name": "analyze_missing_pattern",
+        "description": "결측값 패턴을 분석하여 MCAR, MAR, MNAR 여부를 추정합니다. 결측값이 발생한 원인과 패턴을 파악합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "column": {
+                    "type": "string",
+                    "description": "결측값 패턴을 분석할 컬럼명"
+                }
+            },
+            "required": ["column"]
+        }
+    },
+    {
+        "name": "get_column_correlation_with_target",
+        "description": "특정 타겟 컬럼과 다른 모든 수치형 컬럼들 간의 상관관계를 분석합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target_column": {
+                    "type": "string",
+                    "description": "타겟 컬럼명"
+                }
+            },
+            "required": ["target_column"]
+        }
+    },
+    {
+        "name": "detect_data_types",
+        "description": "컬럼별 실제 데이터 타입을 추론합니다. 숫자처럼 보이는 문자열, 날짜 형식 등을 감지합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "get_temporal_pattern",
+        "description": "시간/날짜 관련 컬럼의 패턴을 분석합니다. 월별, 요일별, 시간대별 분포를 확인합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "column": {
+                    "type": "string",
+                    "description": "시간/날짜 컬럼명"
+                }
+            },
+            "required": ["column"]
+        }
+    },
+    {
+        "name": "summarize_categorical_distribution",
+        "description": "범주형 컬럼의 분포를 상세하게 요약합니다. 집중도, 편향성, 희귀 카테고리 등을 분석합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "column": {
+                    "type": "string",
+                    "description": "범주형 컬럼명"
+                }
+            },
+            "required": ["column"]
         }
     }
 ]
@@ -854,6 +927,391 @@ def cross_tabulation(df: pd.DataFrame, row_column: str, col_column: str, normali
 
 
 # ============================================================================
+# v1.1.2 추가 도구 핸들러 (5개)
+# ============================================================================
+
+def analyze_missing_pattern(df: pd.DataFrame, column: str, **kwargs) -> str:
+    """
+    결측값 패턴을 분석하여 MCAR, MAR, MNAR 여부를 추정합니다.
+
+    Parameters:
+        df (pd.DataFrame): 분석할 DataFrame
+        column (str): 결측값 패턴을 분석할 컬럼명
+
+    Returns:
+        str: 결측값 패턴 분석 결과 문자열
+    """
+    if column not in df.columns:
+        return f"'{column}' 컬럼을 찾을 수 없습니다."
+
+    missing_mask = df[column].isnull()
+    total_rows = len(df)
+    missing_count = missing_mask.sum()
+    missing_pct = (missing_count / total_rows * 100) if total_rows > 0 else 0
+
+    if missing_count == 0:
+        return f"'{column}' 컬럼에 결측값이 없습니다."
+
+    lines = [
+        f"## '{column}' 컬럼 결측값 패턴 분석",
+        f"",
+        f"### 기본 현황",
+        f"- 전체 행 수: {total_rows:,}",
+        f"- 결측값 수: {missing_count:,} ({missing_pct:.1f}%)",
+        f"",
+        f"### 결측값 패턴 추정"
+    ]
+
+    # 다른 컬럼들과의 관계 분석
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if column in numeric_cols:
+        numeric_cols.remove(column)
+
+    correlations = []
+    for other_col in numeric_cols[:5]:  # 최대 5개 컬럼만 분석
+        # 결측 여부와 다른 컬럼 값 간의 상관관계
+        valid_mask = df[other_col].notna()
+        if valid_mask.sum() > 10:
+            missing_indicator = missing_mask.astype(int)
+            corr = df.loc[valid_mask, [other_col]].assign(missing=missing_indicator[valid_mask])
+            r = corr['missing'].corr(corr[other_col])
+            if not np.isnan(r):
+                correlations.append((other_col, abs(r)))
+
+    if correlations:
+        correlations.sort(key=lambda x: x[1], reverse=True)
+        max_corr = correlations[0][1]
+
+        if max_corr < 0.1:
+            pattern_type = "MCAR (완전 무작위 결측)"
+            pattern_desc = "결측값이 다른 변수들과 거의 상관관계가 없습니다. 무작위로 발생한 것으로 추정됩니다."
+        elif max_corr < 0.3:
+            pattern_type = "MAR 가능성 (무작위 결측)"
+            pattern_desc = "결측값이 다른 변수들과 약한 상관관계를 보입니다. 관측된 다른 변수에 의존할 수 있습니다."
+        else:
+            pattern_type = "MNAR 가능성 (비무작위 결측)"
+            pattern_desc = "결측값이 다른 변수들과 상당한 상관관계를 보입니다. 결측 자체가 특정 패턴을 따를 수 있습니다."
+
+        lines.append(f"- **추정 유형**: {pattern_type}")
+        lines.append(f"- **설명**: {pattern_desc}")
+        lines.append(f"")
+        lines.append(f"### 관련 컬럼과의 상관관계")
+        for col_name, corr_val in correlations[:3]:
+            lines.append(f"- {col_name}: {corr_val:.3f}")
+    else:
+        lines.append("- 상관관계 분석을 위한 수치형 컬럼이 부족합니다.")
+
+    # 결측값이 있는 행의 특성
+    missing_rows = df[missing_mask]
+    non_missing_rows = df[~missing_mask]
+
+    if len(numeric_cols) > 0:
+        lines.append(f"")
+        lines.append(f"### 결측/비결측 그룹 비교 (수치형 컬럼)")
+        for other_col in numeric_cols[:3]:
+            missing_mean = missing_rows[other_col].mean()
+            non_missing_mean = non_missing_rows[other_col].mean()
+            if not np.isnan(missing_mean) and not np.isnan(non_missing_mean):
+                diff_pct = ((missing_mean - non_missing_mean) / non_missing_mean * 100) if non_missing_mean != 0 else 0
+                lines.append(f"- {other_col}: 결측 그룹 평균={missing_mean:.2f}, 비결측 그룹 평균={non_missing_mean:.2f} (차이: {diff_pct:+.1f}%)")
+
+    return "\n".join(lines)
+
+
+def get_column_correlation_with_target(df: pd.DataFrame, target_column: str, **kwargs) -> str:
+    """
+    특정 타겟 컬럼과 다른 모든 수치형 컬럼들 간의 상관관계를 분석합니다.
+
+    Parameters:
+        df (pd.DataFrame): 분석할 DataFrame
+        target_column (str): 타겟 컬럼명
+
+    Returns:
+        str: 상관관계 분석 결과 문자열
+    """
+    if target_column not in df.columns:
+        return f"'{target_column}' 컬럼을 찾을 수 없습니다."
+
+    if not pd.api.types.is_numeric_dtype(df[target_column]):
+        return f"'{target_column}' 컬럼은 수치형이 아닙니다. 상관관계 분석에는 수치형 컬럼이 필요합니다."
+
+    numeric_df = df.select_dtypes(include=[np.number])
+    if len(numeric_df.columns) < 2:
+        return "상관관계 분석에는 최소 2개의 수치형 컬럼이 필요합니다."
+
+    correlations = []
+    for col in numeric_df.columns:
+        if col != target_column:
+            corr = numeric_df[target_column].corr(numeric_df[col])
+            if not np.isnan(corr):
+                correlations.append((col, corr))
+
+    if not correlations:
+        return "상관관계를 계산할 수 있는 컬럼이 없습니다."
+
+    # 상관계수 절대값 기준 정렬
+    correlations.sort(key=lambda x: abs(x[1]), reverse=True)
+
+    lines = [
+        f"## '{target_column}' 컬럼과의 상관관계 분석",
+        f"",
+        f"### 상관계수 순위 (절대값 기준)"
+    ]
+
+    for idx, (col, corr) in enumerate(correlations, 1):
+        # 상관관계 강도 해석
+        abs_corr = abs(corr)
+        if abs_corr >= 0.7:
+            strength = "🔴 강함"
+        elif abs_corr >= 0.4:
+            strength = "🟡 중간"
+        elif abs_corr >= 0.2:
+            strength = "🟢 약함"
+        else:
+            strength = "⚪ 매우 약함"
+
+        direction = "양의 상관" if corr > 0 else "음의 상관"
+        lines.append(f"{idx}. {col}: {corr:+.3f} ({strength}, {direction})")
+
+    # 요약
+    strong_corrs = [c for c in correlations if abs(c[1]) >= 0.4]
+    if strong_corrs:
+        lines.append(f"")
+        lines.append(f"### 요약")
+        lines.append(f"- 중간 이상 상관관계: {len(strong_corrs)}개 컬럼")
+        lines.append(f"- 가장 강한 상관: {correlations[0][0]} ({correlations[0][1]:+.3f})")
+
+    return "\n".join(lines)
+
+
+def detect_data_types(df: pd.DataFrame, **kwargs) -> str:
+    """
+    컬럼별 실제 데이터 타입을 추론합니다.
+
+    Parameters:
+        df (pd.DataFrame): 분석할 DataFrame
+
+    Returns:
+        str: 데이터 타입 추론 결과 문자열
+    """
+    if df.empty:
+        return "데이터가 없습니다 (빈 DataFrame)."
+
+    lines = [
+        f"## 컬럼별 데이터 타입 분석",
+        f"",
+        f"| 컬럼명 | pandas 타입 | 추론 타입 | 비고 |",
+        f"|--------|-------------|-----------|------|"
+    ]
+
+    for col in df.columns:
+        pandas_dtype = str(df[col].dtype)
+        sample = df[col].dropna()
+
+        if len(sample) == 0:
+            inferred_type = "알 수 없음"
+            note = "모든 값이 결측"
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            # 정수/실수 구분
+            if pd.api.types.is_integer_dtype(df[col]):
+                unique_ratio = df[col].nunique() / len(sample)
+                if unique_ratio < 0.05:
+                    inferred_type = "범주형 (코드)"
+                    note = f"고유값 {df[col].nunique()}개"
+                else:
+                    inferred_type = "정수"
+                    note = ""
+            else:
+                inferred_type = "실수"
+                note = ""
+        elif pd.api.types.is_datetime64_any_dtype(df[col]):
+            inferred_type = "날짜/시간"
+            note = ""
+        else:
+            # 문자열 타입 세부 분석
+            sample_vals = sample.astype(str).head(100)
+            inferred_type = None
+            note = ""
+
+            # 날짜 형식 체크
+            try:
+                pd.to_datetime(sample_vals, errors='raise')
+                inferred_type = "날짜 (문자열)"
+                note = "datetime 변환 가능"
+            except (ValueError, TypeError):
+                pass
+
+            # 숫자 형식 체크
+            if inferred_type is None:
+                try:
+                    pd.to_numeric(sample_vals, errors='raise')
+                    inferred_type = "숫자 (문자열)"
+                    note = "numeric 변환 가능"
+                except (ValueError, TypeError):
+                    pass
+
+            # 일반 범주형
+            if inferred_type is None:
+                unique_count = df[col].nunique()
+                if unique_count <= 20:
+                    inferred_type = "범주형"
+                    note = f"고유값 {unique_count}개"
+                elif unique_count <= len(df) * 0.5:
+                    inferred_type = "범주형 (다수)"
+                    note = f"고유값 {unique_count}개"
+                else:
+                    inferred_type = "텍스트/ID"
+                    note = "고유값 비율 높음"
+
+        lines.append(f"| {col} | {pandas_dtype} | {inferred_type} | {note} |")
+
+    return "\n".join(lines)
+
+
+def get_temporal_pattern(df: pd.DataFrame, column: str, **kwargs) -> str:
+    """
+    시간/날짜 관련 컬럼의 패턴을 분석합니다.
+
+    Parameters:
+        df (pd.DataFrame): 분석할 DataFrame
+        column (str): 시간/날짜 컬럼명
+
+    Returns:
+        str: 시간 패턴 분석 결과 문자열
+    """
+    if column not in df.columns:
+        return f"'{column}' 컬럼을 찾을 수 없습니다."
+
+    try:
+        date_col = pd.to_datetime(df[column], errors='coerce')
+        valid_dates = date_col.dropna()
+
+        if len(valid_dates) == 0:
+            return f"'{column}' 컬럼에 유효한 날짜 데이터가 없습니다."
+
+        lines = [
+            f"## '{column}' 컬럼 시간 패턴 분석",
+            f"",
+            f"### 기본 정보",
+            f"- 유효 날짜 수: {len(valid_dates):,}개",
+            f"- 기간: {valid_dates.min().strftime('%Y-%m-%d')} ~ {valid_dates.max().strftime('%Y-%m-%d')}"
+        ]
+
+        # 연도별 분포
+        if valid_dates.dt.year.nunique() > 1:
+            year_dist = valid_dates.dt.year.value_counts().sort_index()
+            lines.append(f"")
+            lines.append(f"### 연도별 분포")
+            for year, count in year_dist.items():
+                pct = count / len(valid_dates) * 100
+                lines.append(f"- {year}년: {count:,}개 ({pct:.1f}%)")
+
+        # 월별 분포
+        month_dist = valid_dates.dt.month.value_counts().sort_index()
+        lines.append(f"")
+        lines.append(f"### 월별 분포")
+        month_names = ['1월', '2월', '3월', '4월', '5월', '6월',
+                       '7월', '8월', '9월', '10월', '11월', '12월']
+        for month, count in month_dist.items():
+            pct = count / len(valid_dates) * 100
+            lines.append(f"- {month_names[month-1]}: {count:,}개 ({pct:.1f}%)")
+
+        # 요일별 분포
+        day_dist = valid_dates.dt.dayofweek.value_counts().sort_index()
+        lines.append(f"")
+        lines.append(f"### 요일별 분포")
+        day_names = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
+        for day, count in day_dist.items():
+            pct = count / len(valid_dates) * 100
+            lines.append(f"- {day_names[day]}: {count:,}개 ({pct:.1f}%)")
+
+        # 시간대별 분포 (시간 정보가 있는 경우)
+        if valid_dates.dt.hour.nunique() > 1:
+            hour_dist = valid_dates.dt.hour.value_counts().sort_index()
+            lines.append(f"")
+            lines.append(f"### 시간대별 분포 (상위 5개)")
+            for hour, count in hour_dist.head(5).items():
+                pct = count / len(valid_dates) * 100
+                lines.append(f"- {hour}시: {count:,}개 ({pct:.1f}%)")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"시간 패턴 분석 중 오류 발생: {str(e)}"
+
+
+def summarize_categorical_distribution(df: pd.DataFrame, column: str, **kwargs) -> str:
+    """
+    범주형 컬럼의 분포를 상세하게 요약합니다.
+
+    Parameters:
+        df (pd.DataFrame): 분석할 DataFrame
+        column (str): 범주형 컬럼명
+
+    Returns:
+        str: 범주형 분포 요약 문자열
+    """
+    if column not in df.columns:
+        return f"'{column}' 컬럼을 찾을 수 없습니다."
+
+    value_counts = df[column].value_counts()
+    total = len(df)
+    unique_count = len(value_counts)
+    missing_count = df[column].isnull().sum()
+
+    lines = [
+        f"## '{column}' 컬럼 범주형 분포 분석",
+        f"",
+        f"### 기본 통계",
+        f"- 전체 행 수: {total:,}",
+        f"- 고유 카테고리 수: {unique_count}",
+        f"- 결측값: {missing_count:,}개 ({missing_count/total*100:.1f}%)"
+    ]
+
+    # 집중도 분석
+    if unique_count > 0:
+        top1_pct = value_counts.iloc[0] / (total - missing_count) * 100 if (total - missing_count) > 0 else 0
+        top3_pct = value_counts.head(3).sum() / (total - missing_count) * 100 if (total - missing_count) > 0 else 0
+
+        lines.append(f"")
+        lines.append(f"### 집중도 분석")
+        lines.append(f"- 최빈값 비율: {top1_pct:.1f}% ({value_counts.index[0]})")
+        lines.append(f"- 상위 3개 비율: {top3_pct:.1f}%")
+
+        # 편향성 판단
+        if top1_pct > 80:
+            bias = "🔴 매우 편향됨 (단일 값이 80% 이상)"
+        elif top1_pct > 50:
+            bias = "🟡 편향됨 (단일 값이 50% 이상)"
+        elif top3_pct > 80:
+            bias = "🟡 약간 편향됨 (상위 3개가 80% 이상)"
+        else:
+            bias = "🟢 균형적 분포"
+        lines.append(f"- 편향성: {bias}")
+
+    # 희귀 카테고리 분석
+    rare_threshold = total * 0.01  # 1% 미만
+    rare_categories = value_counts[value_counts < rare_threshold]
+    if len(rare_categories) > 0:
+        lines.append(f"")
+        lines.append(f"### 희귀 카테고리 (1% 미만)")
+        lines.append(f"- 희귀 카테고리 수: {len(rare_categories)}개")
+        lines.append(f"- 희귀 카테고리 합계: {rare_categories.sum():,}개 ({rare_categories.sum()/total*100:.2f}%)")
+        if len(rare_categories) <= 10:
+            for cat, count in rare_categories.items():
+                lines.append(f"  - {cat}: {count}개")
+
+    # 상위 카테고리
+    lines.append(f"")
+    lines.append(f"### 상위 카테고리 (최대 10개)")
+    for idx, (cat, count) in enumerate(value_counts.head(10).items(), 1):
+        pct = count / (total - missing_count) * 100 if (total - missing_count) > 0 else 0
+        lines.append(f"{idx}. {cat}: {count:,}개 ({pct:.1f}%)")
+
+    return "\n".join(lines)
+
+
+# ============================================================================
 # Tool Dispatcher (T026)
 # ============================================================================
 
@@ -874,6 +1332,12 @@ TOOL_HANDLERS = {
     "calculate_percentile": calculate_percentile,
     "get_geo_bounds": get_geo_bounds,
     "cross_tabulation": cross_tabulation,
+    # v1.1.2: 5개 추가 도구
+    "analyze_missing_pattern": analyze_missing_pattern,
+    "get_column_correlation_with_target": get_column_correlation_with_target,
+    "detect_data_types": detect_data_types,
+    "get_temporal_pattern": get_temporal_pattern,
+    "summarize_categorical_distribution": summarize_categorical_distribution,
 }
 
 
