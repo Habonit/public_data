@@ -1,89 +1,37 @@
-# Implementation Plan: Daegu Public Data Visualization
+# Implementation Plan: [FEATURE]
 
-**Branch**: `001-daegu-data-viz` | **Date**: 2025-11-21 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-daegu-data-viz/spec.md`
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-Build a Streamlit-based web application for visualizing seven public datasets from Daegu
-(CCTV, Security Lights, Child Protection Zones, Parking Lots) plus nationwide accident
-data and train/test datasets. The application provides tab-based navigation for
-individual dataset exploration with statistics and maps, cross-dataset spatial analysis
-using Haversine distance calculations, and integrated educational content explaining
-data analysis concepts. The primary goal is enabling data analysis learners to
-independently discover insights and formulate project ideas through interactive visualization.
+[Extract from feature spec: primary requirement + technical approach from research]
 
 ## Technical Context
 
-**Language/Version**: Python 3.10+
-**Primary Dependencies**: Streamlit, pandas, numpy, plotly, folium, streamlit-folium
-**Storage**: CSV files in `/data` directory (no database)
-**Testing**: Manual exploratory testing (automated tests optional, must not add complexity per constitution)
-**Target Platform**: Local execution on Windows, macOS, Linux
-**Project Type**: Single Streamlit application
-**Performance Goals**: Initial load <3 seconds, map rendering smooth up to 5,000 points, tab switching <1 second
-**Constraints**: Python beginners must understand code (no complex patterns), local-only execution (no deployment), educational clarity prioritized over optimization
-**Scale/Scope**: 7 datasets, 9 tabs, single app.py or modular pages/ structure, <1GB total data
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
+
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [single/web/mobile - determines source structure]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### Principle I: Data-First Exploration ✅
-
-**Requirement**: Feature must prioritize data structure, relationships, and distribution understanding.
-
-**Compliance**: PASS - The entire application is designed around exploring seven datasets
-with statistics, visualizations, and cross-dataset spatial analysis. Every tab focuses
-on data comprehension rather than complex modeling.
-
-### Principle II: Simplicity & Accessibility ✅
-
-**Requirement**: Code must be simple enough for Python beginners to understand.
-
-**Compliance**: PASS - Architecture uses simple module structure (utils/loader.py, utils/geo.py,
-utils/visualizer.py) with no complex patterns (no repositories, factories, dependency injection).
-All logic is straightforward data loading, calculation, and visualization.
-
-### Principle III: Educational Purpose (NON-NEGOTIABLE) ✅
-
-**Requirement**: Feature must support learners in defining problems and planning projects independently.
-
-**Compliance**: PASS - Application provides:
-- Statistical summaries and visualizations triggering analytical thinking
-- Cross-dataset correlation discovery capabilities
-- Project Overview tab with educational concepts
-- Natural language insights to guide interpretation
-- Multiple examples of spatial pattern analysis
-
-### Principle IV: Streamlit-Based Visualization ✅
-
-**Requirement**: Must be Streamlit-based responsive web visualization tool.
-
-**Compliance**: PASS - Entire application built on Streamlit with:
-- Tab-based navigation for each dataset
-- Interactive graphs using Plotly
-- Map-based visualizations using Folium
-- Responsive UI design
-- Local execution only
-
-### Principle V: Scope Discipline ✅
-
-**Requirement**: Features must stay within defined scope boundaries.
-
-**Compliance**: PASS - Included scope items all present (Streamlit UI, CSV loading, graph/map
-visualizations, cross-dataset exploration). Excluded scope items properly avoided
-(no backend API, no database, no ML model training, no deployment infrastructure,
-no advanced GIS operations).
-
-### Summary
-
-**Status**: ✅ ALL CHECKS PASSED
-
-No constitution violations detected. All five core principles are satisfied by the
-planned architecture and feature set.
+[Gates determined based on constitution file]
 
 ## Project Structure
 
@@ -100,57 +48,57 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
 
 ```text
-project-directory/
-├── app.py                      # Main Streamlit entry point, tab configuration
-├── pages/                      # Optional: multi-page structure for each tab
-│   ├── 01_CCTV.py
-│   ├── 02_Security_Lights.py
-│   ├── 03_Child_Protection_Zones.py
-│   ├── 04_Parking_Lots.py
-│   ├── 05_Accident.py
-│   ├── 06_Train.py
-│   ├── 07_Test.py
-│   ├── 08_Cross_Analysis.py
-│   └── 09_Project_Overview.py
-├── utils/
-│   ├── loader.py              # Data loading with caching (@st.cache_data)
-│   ├── geo.py                 # Haversine distance calculation, coordinate detection
-│   ├── visualizer.py          # Common graph/map generation functions
-│   └── narration.py           # Text-based insight generation
-├── data/
-│   ├── 대구 CCTV 정보.csv
-│   ├── 대구 보안등 정보.csv
-│   ├── 대구 어린이 보호 구역 정보.csv
-│   ├── 대구 주차장 정보.csv
-│   ├── countrywide_accident.csv
-│   ├── train.csv
-│   └── test.csv
-├── requirements.txt
-├── docs/
-│   ├── daegu_constitution.md
-│   ├── daegu_spec.md
-│   └── dagu_plan.md
-└── specs/
-    └── 001-daegu-data-viz/
-        ├── spec.md
-        ├── plan.md              # This file
-        ├── research.md          # Phase 0 output
-        ├── data-model.md        # Phase 1 output
-        ├── quickstart.md        # Phase 1 output
-        └── contracts/           # Phase 1 output (if applicable)
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+src/
+├── models/
+├── services/
+├── cli/
+└── lib/
+
+tests/
+├── contract/
+├── integration/
+└── unit/
+
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
 ```
 
-**Structure Decision**: Single Streamlit application with modular utility functions.
-Initially implement all tabs within `app.py` using `st.tabs()` for simplicity.
-If code becomes unwieldy (>500 lines), migrate to `pages/` multi-page structure
-with numbered files for tab ordering. The `utils/` directory provides clean
-separation of concerns (data loading, geospatial calculations, visualization,
-narrative generation) while maintaining beginner-friendly code readability.
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-No complexity violations detected. All architectural decisions align with constitution principles.
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |

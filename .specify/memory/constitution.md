@@ -1,9 +1,9 @@
 <!--
 Sync Impact Report:
 ===================
-Version: 1.0.0 → 1.1.0 (MINOR - 새 섹션 추가)
+Version: 1.1.0 → 1.2.0 (MINOR - 새 의존성 추가 및 데이터 로딩 방식 변경 반영)
 Ratification Date: 2025-11-21
-Last Amended: 2025-12-01
+Last Amended: 2025-12-02
 
 Modified Principles:
 - UNCHANGED: I. Data-First Exploration
@@ -13,11 +13,11 @@ Modified Principles:
 - UNCHANGED: V. Scope Discipline
 
 Added Sections:
-- VI. Git Commit Convention (NEW)
-- VII. Python Code Style (NEW)
-- VIII. Data Handling Rules (NEW - Data Governance 확장)
-- IX. Dependencies (NEW - 구체적 버전 명시)
-- X. Documentation & Comments (NEW - 한글 우선 규칙)
+- None
+
+Modified Sections:
+- VIII. Data Handling Rules: 데이터 로딩 방식 (고정 파일 → CSV 업로드) 반영
+- IX. Dependencies: anthropic 패키지 추가 (AI 챗봇 기능)
 
 Removed Sections:
 - None
@@ -31,9 +31,9 @@ Follow-up TODOs:
 - None (all placeholders filled)
 
 Change Summary (한국어):
-- docs/constitution.md의 개발 규칙을 모두 반영
-- Git 커밋 컨벤션, Python 코드 스타일, 데이터 처리 규칙 추가
-- 의존성 버전 명시, 문서화 언어 규칙(한글 우선) 추가
+- v1.1 앱 개선사항 반영: CSV 업로드 방식, AI 챗봇 기능
+- anthropic 패키지를 필수 의존성으로 추가
+- 데이터 로딩 방식을 업로드 기반으로 문서 업데이트
 -->
 
 # 대구 공공데이터 시각화 프로젝트 Constitution
@@ -89,11 +89,12 @@ Change Summary (한국어):
 
 **포함 범위**:
 - Streamlit 기반 반응형 웹 UI
-- CSV 데이터 로딩 및 기본 통계
+- CSV 데이터 업로드 및 기본 통계
 - 그래프 시각화 (Plotly 등)
 - 지도 기반 시각화 (Folium, Pydeck 등)
 - 데이터셋 간 관계 탐색
 - 경량 탐색적 분석 기능
+- AI 기반 데이터 질의응답 (챗봇)
 
 **제외 범위**:
 - 별도 백엔드 API 개발
@@ -204,7 +205,15 @@ def function_name(param1: str, param2: int) -> dict:
 
 한글 파일명 지원 필수(MUST)
 
-### 8.2 좌표 컬럼 감지
+### 8.2 데이터 로딩 방식
+
+**v1.1 이후**: 사용자가 CSV 파일을 직접 업로드하는 방식
+
+- 프로젝트 개요 탭에서 데이터셋별 업로드 UI 제공
+- 업로드된 데이터는 `st.session_state`에 캐싱
+- 데이터 미업로드 시 해당 탭에서 안내 메시지 표시
+
+### 8.3 좌표 컬럼 감지
 
 자동 감지 대상 컬럼명:
 
@@ -213,27 +222,24 @@ def function_name(param1: str, param2: int) -> dict:
 | 위도 | `lat`, `latitude`, `위도`, `y좌표`, `y`, `Lat`, `Latitude` |
 | 경도 | `lng`, `lon`, `longitude`, `경도`, `x좌표`, `x`, `Lng`, `Lon`, `Longitude` |
 
-### 8.3 성능 제한
+### 8.4 성능 제한
 
 | 항목 | 제한 | 초과 시 처리 |
 |------|------|-------------|
 | 지도 시각화 최대 포인트 | 5,000개 | 샘플링 |
-| 근접성 분석 최대 행 | 5,000행 | 샘플링 |
 | 범주형 컬럼 상위 표시 | 20개 | 상위 N개만 표시 |
 
-### 8.4 데이터셋 사양
+### 8.5 지원 데이터셋
 
-모든 데이터 파일은 `/data` 디렉토리에 있어야 한다(MUST):
+다음 형식의 CSV 파일 업로드를 지원한다:
 
-- `대구 CCTV 정보.csv`
-- `대구 보안등 정보.csv`
-- `대구 어린이 보호 구역 정보.csv`
-- `대구 주차장 정보.csv`
-- `countrywide_accident.csv`
-- `train.csv`
-- `test.csv`
-
-**데이터 무결성**: 파일명과 확장자는 변경해서는 안 된다(MUST NOT).
+- CCTV 정보 (대구 CCTV 정보.csv)
+- 보안등 정보 (대구 보안등 정보.csv)
+- 어린이 보호구역 정보 (대구 어린이 보호 구역 정보.csv)
+- 주차장 정보 (대구 주차장 정보.csv)
+- 사고 데이터 (countrywide_accident.csv)
+- 훈련 데이터 (train.csv)
+- 테스트 데이터 (test.csv)
 
 ---
 
@@ -249,6 +255,7 @@ def function_name(param1: str, param2: int) -> dict:
 | plotly | 5.17.0 | 대화형 차트 |
 | folium | 0.14.0 | 지도 시각화 |
 | streamlit-folium | 0.15.0 | Folium-Streamlit 통합 |
+| anthropic | 0.39.0 | AI 챗봇 (Claude API) |
 
 ### 선택적 패키지
 
@@ -257,6 +264,8 @@ def function_name(param1: str, param2: int) -> dict:
 | geopandas | 지도 렌더링 (선택) |
 | pydeck | 지도 시각화 대안 (선택) |
 | leafmap | 지도 시각화 대안 (선택) |
+| matplotlib | 추가 시각화 (선택) |
+| openpyxl | Excel 파일 지원 (선택) |
 
 ---
 
@@ -368,7 +377,8 @@ streamlit run app.py
 |------|------|------|
 | v1.0.0 | 2025-11-21 | 최초 제정 - 5개 핵심 원칙 정의 |
 | v1.1.0 | 2025-12-01 | docs/constitution.md 통합 - Git 규칙, 코드 스타일, 데이터 처리, 의존성, 문서화 규칙 추가 |
+| v1.2.0 | 2025-12-02 | v1.1 앱 개선사항 반영 - anthropic 패키지 추가, CSV 업로드 방식, AI 챗봇 범위 추가 |
 
 ---
 
-**Version**: 1.1.0 | **Ratified**: 2025-11-21 | **Last Amended**: 2025-12-01
+**Version**: 1.2.0 | **Ratified**: 2025-11-21 | **Last Amended**: 2025-12-02
