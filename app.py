@@ -23,10 +23,18 @@ from utils.visualizer import (
     create_folium_map,
     create_overlay_map
 )
+from utils.geo import compute_proximity_stats
+from utils.narration import (
+    summarize_proximity_stats,
+    generate_distribution_insight,
+    compare_distributions
+)
 from utils.chatbot import (
     SYSTEM_PROMPT,
     create_data_context,
     create_chat_response,
+    create_chat_response_with_tools,
+    stream_chat_response_with_tools,
     handle_chat_error,
     validate_api_key
 )
@@ -80,9 +88,9 @@ DATASET_MAPPING = {
 
 # AI 모델 옵션
 AI_MODEL_OPTIONS = [
-    {'id': 'claude-sonnet-4-20250514', 'name': 'Claude Sonnet 4', 'description': '빠른 응답, 비용 효율적 (권장)'},
-    {'id': 'claude-opus-4-20250514', 'name': 'Claude Opus 4', 'description': '복잡한 분석에 적합'},
-    {'id': 'claude-3-5-haiku-20241022', 'name': 'Claude 3.5 Haiku', 'description': '간단한 질문에 최적'}
+    {'id': 'claude-sonnet-4-5-20250929', 'name': 'Claude Sonnet 4.5', 'description': '빠른 응답, 비용 효율적 (권장)'},
+    {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5', 'description': '복잡한 분석에 적합'},
+    {'id': 'claude-haiku-4-5-20250901', 'name': 'Claude Haiku 4.5', 'description': '간단한 질문에 최적'}
 ]
 
 
@@ -108,13 +116,39 @@ def init_session_state():
     if 'chatbot' not in st.session_state:
         st.session_state.chatbot = {
             'api_key': '',
-            'model': 'claude-sonnet-4-20250514',
+            'model': 'claude-sonnet-4-5-20250929',
             'selected_dataset': None,
-            'messages': [],
+            'chat_history': {},  # T035: Dataset-specific chat history
             'tokens': {'total': 0, 'input': 0, 'output': 0}
         }
 
     st.session_state.initialized = True
+
+
+def get_chat_history(dataset_name: str) -> list:
+    """
+    Get chat history for a specific dataset. (T036)
+
+    Parameters:
+        dataset_name (str): Dataset key (e.g., 'cctv', 'lights')
+
+    Returns:
+        list: Chat history for the dataset
+    """
+    if dataset_name not in st.session_state.chatbot['chat_history']:
+        st.session_state.chatbot['chat_history'][dataset_name] = []
+    return st.session_state.chatbot['chat_history'][dataset_name]
+
+
+def clear_chat_history(dataset_name: str) -> None:
+    """
+    Clear chat history for a specific dataset. (T037)
+
+    Parameters:
+        dataset_name (str): Dataset key (e.g., 'cctv', 'lights')
+    """
+    st.session_state.chatbot['chat_history'][dataset_name] = []
+
 
 # Page configuration
 st.set_page_config(
@@ -195,16 +229,18 @@ def render_dataset_tab(dataset_name: str, dataset_display_name: str):
         popup_candidates = [col for col in df.columns if col not in [lat_col, lng_col]]
         popup_cols = popup_candidates[:3]  # Show first 3 columns in popup
 
-        # Create map
-        map_obj = create_folium_map(
-            df, lat_col, lng_col,
-            popup_cols=popup_cols,
-            color='blue',
-            name=dataset_display_name
-        )
+        # T041: Map caching with session_state
+        cache_key = f"map_{dataset_name}_{len(df)}"
+        if cache_key not in st.session_state:
+            st.session_state[cache_key] = create_folium_map(
+                df, lat_col, lng_col,
+                popup_cols=popup_cols,
+                color='blue',
+                name=dataset_display_name
+            )
 
-        # Display map
-        st_folium(map_obj, width=700, height=500)
+        # T042: Display map with returned_objects=[] to prevent rerendering
+        st_folium(st.session_state[cache_key], width=700, height=500, returned_objects=[])
     else:
         st.info("ℹ️ 지리 좌표가 감지되지 않았습니다. 이 데이터셋에는 지도 시각화를 사용할 수 없습니다.")
 
@@ -413,7 +449,7 @@ def render_overview_tab():
     2. "데이터 질의응답" 탭에서 질문을 입력합니다
     """)
 
-    # Technical Information
+    # Technical Information (T045)
     st.subheader("🔧 기술 스택")
 
     tech_col1, tech_col2, tech_col3 = st.columns(3)
@@ -421,16 +457,16 @@ def render_overview_tab():
     with tech_col1:
         st.markdown("""
         **프론트엔드**
-        - Streamlit
-        - Plotly
-        - Folium
+        - Streamlit 1.28+
+        - Plotly 5.17+
+        - Folium 0.14+
         """)
 
     with tech_col2:
         st.markdown("""
         **데이터 처리**
-        - Pandas
-        - NumPy
+        - Pandas 2.0+
+        - NumPy 1.24+
         """)
 
     with tech_col3:
@@ -440,14 +476,264 @@ def render_overview_tab():
         - Python 3.10+
         """)
 
+    st.markdown("---")
+
+    # System Architecture (T046)
+    st.subheader("🏗️ 시스템 구조")
+
+    st.markdown("""
+    ```
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                        사용자 인터페이스                          │
+    │  ┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐ │
+    │  │프로젝트 │ 개별    │ 교차    │ AI      │         │         │ │
+    │  │개요     │ 데이터셋│ 분석    │ 질의응답│   ...   │   ...   │ │
+    │  └────┬────┴────┬────┴────┬────┴────┬────┴─────────┴─────────┘ │
+    └───────┼─────────┼─────────┼─────────┼───────────────────────────┘
+            │         │         │         │
+            ▼         ▼         ▼         ▼
+    ┌───────────────────────────────────────────────────────────────┐
+    │                     유틸리티 모듈                              │
+    │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ │
+    │  │ loader.py  │ │  geo.py    │ │visualizer  │ │ narration  │ │
+    │  │ (데이터    │ │ (좌표 감지,│ │.py (차트,  │ │.py (인사이 │ │
+    │  │  로딩)     │ │  거리 계산)│ │  지도)     │ │  트 생성)  │ │
+    │  └────────────┘ └────────────┘ └────────────┘ └────────────┘ │
+    └───────────────────────────────────────────────────────────────┘
+            │
+            ▼
+    ┌───────────────────────────────────────────────────────────────┐
+    │                       CSV 데이터 파일                          │
+    │  CCTV | 보안등 | 어린이보호구역 | 주차장 | 사고 | Train | Test │
+    └───────────────────────────────────────────────────────────────┘
+    ```
+    """)
+
+    st.markdown("---")
+
+    # Educational Concepts Section (T047-T052)
+    st.subheader("📚 데이터 분석 기초 개념")
+
+    with st.expander("📊 데이터 타입 이해 (T047)", expanded=False):
+        st.markdown("""
+        ### 데이터 타입
+
+        데이터 분석에서 가장 먼저 이해해야 할 것은 **데이터 타입**입니다.
+
+        **1. 숫자형 데이터 (Numerical)**
+        - **연속형**: 측정 가능한 값 (예: 위도, 경도, 거리)
+        - **이산형**: 셀 수 있는 값 (예: CCTV 수, 주차 면수)
+
+        **2. 범주형 데이터 (Categorical)**
+        - **명목형**: 순서 없는 범주 (예: 구역명, 시설 유형)
+        - **순서형**: 순서 있는 범주 (예: 등급, 우선순위)
+
+        **3. 날짜/시간 데이터 (Datetime)**
+        - 시계열 분석에 사용 (예: 설치일, 사고일)
+
+        **4. 텍스트 데이터 (Text)**
+        - 주소, 설명 등 자유 형식 텍스트
+        """)
+
+    with st.expander("📈 기본 통계 지표 (T048)", expanded=False):
+        st.markdown("""
+        ### 기본 통계 지표
+
+        **중심 경향성 (Central Tendency)**
+        - **평균 (Mean)**: 모든 값의 합 ÷ 개수. 극단값에 민감
+        - **중앙값 (Median)**: 정렬 시 가운데 값. 극단값에 강건
+        - **최빈값 (Mode)**: 가장 자주 나타나는 값
+
+        **산포도 (Dispersion)**
+        - **표준편차 (Standard Deviation)**: 평균으로부터의 평균 거리
+        - **분산 (Variance)**: 표준편차의 제곱
+        - **범위 (Range)**: 최대값 - 최소값
+        - **사분위 범위 (IQR)**: Q3 - Q1
+
+        **위치 통계량 (Percentiles)**
+        - **Q1 (25%)**: 하위 25% 지점
+        - **Q2 (50%)**: 중앙값
+        - **Q3 (75%)**: 상위 25% 지점
+        """)
+
+    with st.expander("❓ 결측값과 이상치 (T049)", expanded=False):
+        st.markdown("""
+        ### 결측값 (Missing Values)
+
+        **결측값이란?**
+        - 데이터 수집 과정에서 누락된 값
+        - 비어있거나 NULL, NaN 등으로 표시
+
+        **처리 방법**
+        - **삭제**: 결측값이 있는 행/열 제거
+        - **대체**: 평균, 중앙값, 최빈값으로 대체
+        - **예측**: 다른 변수를 사용해 예측
+
+        ---
+
+        ### 이상치 (Outliers)
+
+        **이상치란?**
+        - 대부분의 데이터와 크게 다른 값
+        - 오류이거나 실제로 특이한 관측치
+
+        **탐지 방법**
+        - **IQR 방법**: Q1 - 1.5×IQR 미만 또는 Q3 + 1.5×IQR 초과
+        - **Z-점수**: 평균에서 3 표준편차 이상 떨어진 값
+        - **시각화**: 박스플롯, 산점도로 확인
+        """)
+
+    with st.expander("📉 분포와 지리 좌표 (T050)", expanded=False):
+        st.markdown("""
+        ### 데이터 분포
+
+        **분포의 형태**
+        - **정규 분포**: 종 모양, 평균 중심 대칭
+        - **오른쪽 치우침**: 꼬리가 오른쪽으로 긴 형태
+        - **왼쪽 치우침**: 꼬리가 왼쪽으로 긴 형태
+        - **이봉 분포**: 두 개의 봉우리가 있는 형태
+
+        **왜도 (Skewness)**
+        - 양수: 오른쪽 치우침
+        - 음수: 왼쪽 치우침
+        - 0에 가까움: 대칭
+
+        ---
+
+        ### 지리 좌표계
+
+        **위도 (Latitude)**: 적도 기준 남북 위치
+        - 북위: +, 남위: -
+        - 대구: 약 35.8°N
+
+        **경도 (Longitude)**: 본초자오선 기준 동서 위치
+        - 동경: +, 서경: -
+        - 대구: 약 128.6°E
+
+        **하버사인 공식**: 지구상 두 점 사이의 거리 계산
+        - 지구를 구로 가정
+        - 대권 거리(Great-circle distance) 계산
+        """)
+
+    with st.expander("🔗 상관관계와 공간 패턴 (T051)", expanded=False):
+        st.markdown("""
+        ### 상관관계 (Correlation)
+
+        **상관계수**
+        - +1: 완전한 양의 상관 (같이 증가)
+        - -1: 완전한 음의 상관 (반대로 변화)
+        - 0: 상관관계 없음
+
+        **주의점**
+        - 상관관계 ≠ 인과관계
+        - 숨은 변수(교란 변수)가 있을 수 있음
+
+        ---
+
+        ### 공간 패턴
+
+        **클러스터링 (Clustering)**
+        - 특정 지역에 데이터가 집중
+        - 예: CCTV가 특정 구역에 밀집
+
+        **분산 (Dispersion)**
+        - 데이터가 넓게 퍼져 있음
+        - 균등한 분포
+
+        **공간적 자기상관**
+        - 가까운 위치의 값이 유사한 경향
+        - "모든 것은 다른 모든 것과 관련되어 있지만, 가까운 것은 먼 것보다 더 관련되어 있다" - 토블러의 제1법칙
+        """)
+
+    with st.expander("💡 인사이트 도출 방법 (T052)", expanded=False):
+        st.markdown("""
+        ### 인사이트 도출 과정
+
+        **1단계: 데이터 이해**
+        - 각 컬럼의 의미 파악
+        - 데이터 타입 확인
+        - 결측값/이상치 확인
+
+        **2단계: 탐색적 분석**
+        - 기본 통계량 확인
+        - 분포 시각화
+        - 상관관계 탐색
+
+        **3단계: 패턴 발견**
+        - 시간적 패턴: 시간에 따른 변화
+        - 공간적 패턴: 위치에 따른 분포
+        - 범주별 패턴: 그룹 간 차이
+
+        **4단계: 가설 검증**
+        - 발견한 패턴이 유의미한지 확인
+        - 통계적 검정 수행
+        - 다른 데이터로 교차 검증
+
+        **5단계: 인사이트 정리**
+        - 발견한 내용을 명확히 정리
+        - 비즈니스/정책적 함의 도출
+        - 추가 분석 방향 제시
+        """)
+
+    st.markdown("---")
+
+    # Example Questions (T053)
+    st.subheader("🤔 분석 가이드 질문")
+
+    st.markdown("""
+    다음 질문들을 통해 데이터에서 인사이트를 발견해보세요:
+
+    **개별 데이터셋 탐색**
+    - 이 데이터셋에서 가장 빈번하게 나타나는 값은 무엇인가?
+    - 어떤 지역에 시설이 가장 집중되어 있는가?
+    - 시간에 따른 변화 패턴이 있는가?
+
+    **교차 데이터 분석**
+    - 두 시설 간의 공간적 관계는 어떠한가?
+    - 특정 지역에 여러 시설이 함께 밀집되어 있는가?
+    - 훈련 데이터와 테스트 데이터의 분포는 유사한가?
+
+    **심화 분석**
+    - 사고 발생 지점과 안전 시설 사이의 관계는?
+    - 인구 밀집 지역과 공공 시설 배치의 상관관계는?
+    - 시설 배치의 효율성을 어떻게 평가할 수 있는가?
+    """)
+
+    st.markdown("---")
+
+    # Cross-analysis Importance (T054)
+    st.subheader("🔄 교차 데이터 분석의 중요성")
+
+    st.markdown("""
+    **왜 여러 데이터셋을 함께 분석해야 할까요?**
+
+    1. **숨겨진 관계 발견**: 개별 데이터만으로는 보이지 않는 패턴을 찾을 수 있습니다.
+
+    2. **맥락 이해**: 한 현상을 다른 요인과 함께 보면 더 깊은 이해가 가능합니다.
+
+    3. **의사결정 지원**: 여러 요인을 종합적으로 고려한 결정이 가능합니다.
+
+    **예시**
+    - CCTV 설치 위치와 사고 발생 지점을 비교하여 사각지대 파악
+    - 보안등 위치와 범죄 발생률의 관계 분석
+    - 어린이 보호구역과 교통 시설의 근접성 평가
+
+    **공간 시각화 해석 방법**
+    - 색상으로 구분된 레이어를 통해 각 데이터셋의 분포 확인
+    - 겹치는 영역에서 상호작용 패턴 발견
+    - 레이어를 켜고 끄며 개별 분포와 전체 분포 비교
+    """)
+
 
 def render_cross_analysis_tab():
     """
-    Render the cross-data analysis tab. (T023, T024 - simplified, no proximity analysis)
+    Render the cross-data analysis tab with proximity analysis, overlay maps,
+    distribution comparison, and natural language insights. (T028-T041)
     """
     st.header("🔄 교차 데이터 분석")
     st.markdown("""
-    여러 데이터셋을 동시에 지도 위에 표시하여 공간적 관계를 분석합니다.
+    여러 데이터셋을 동시에 지도 위에 표시하고, 공간적 근접성을 분석하며,
+    분포를 비교하여 인사이트를 발견합니다.
     """)
 
     # Check if any datasets are uploaded
@@ -461,7 +747,7 @@ def render_cross_analysis_tab():
         return
 
     # Dataset selection
-    st.subheader("데이터셋 선택")
+    st.subheader("📊 데이터셋 선택")
 
     available_options = {
         DATASET_MAPPING[key]['display_name']: key
@@ -481,6 +767,7 @@ def render_cross_analysis_tab():
 
     # Load selected datasets
     datasets_to_overlay = []
+    datasets_with_coords = {}
     dataset_colors = ['red', 'blue', 'green', 'purple', 'orange', 'darkred', 'darkblue']
 
     for idx, name in enumerate(selected_names):
@@ -503,27 +790,245 @@ def render_cross_analysis_tab():
                     'name': name,
                     'icon': 'info-sign'
                 })
+                datasets_with_coords[name] = {
+                    'df': df,
+                    'lat_col': lat_col,
+                    'lng_col': lng_col,
+                    'key': dataset_key
+                }
             else:
-                st.warning(f"⚠️ {name} 데이터셋에서 좌표 정보를 찾을 수 없습니다.")
+                st.warning(f"⚠️ {name} 데이터셋에서 좌표 정보를 찾을 수 없습니다. (지도 및 근접 분석 제외)")
 
-    # Display overlay map (T024)
-    if datasets_to_overlay:
-        st.subheader("🗺️ 통합 지도 시각화")
+    # Create tabs for different analysis types
+    analysis_tabs = st.tabs(["🗺️ 통합 지도", "📍 근접 분석", "📈 분포 비교"])
 
-        # Show legend
-        st.markdown("**범례:**")
-        legend_cols = st.columns(min(len(datasets_to_overlay), 4))
-        for idx, ds in enumerate(datasets_to_overlay):
-            with legend_cols[idx % 4]:
-                st.markdown(f"🔵 **{ds['name']}** ({len(ds['df']):,}개)")
+    # Tab 1: Overlay Map (T035)
+    with analysis_tabs[0]:
+        if datasets_to_overlay:
+            st.subheader("🗺️ 통합 지도 시각화")
 
-        # Create and display map
-        overlay_map = create_overlay_map(datasets_to_overlay)
-        st_folium(overlay_map, width=900, height=600)
+            # Show legend
+            st.markdown("**범례:**")
+            legend_cols = st.columns(min(len(datasets_to_overlay), 4))
+            for idx, ds in enumerate(datasets_to_overlay):
+                with legend_cols[idx % 4]:
+                    color_emoji = {'red': '🔴', 'blue': '🔵', 'green': '🟢', 'purple': '🟣', 'orange': '🟠', 'darkred': '🔴', 'darkblue': '🔵'}
+                    emoji = color_emoji.get(ds['color'], '⚪')
+                    st.markdown(f"{emoji} **{ds['name']}** ({len(ds['df']):,}개)")
 
-        st.info("💡 지도 우측 상단의 레이어 컨트롤을 사용하여 각 데이터셋을 개별적으로 켜고 끌 수 있습니다.")
-    else:
-        st.warning("⚠️ 좌표 정보가 있는 데이터셋이 없습니다.")
+            # Overlay map caching with session_state
+            overlay_cache_key = f"overlay_map_{len(datasets_to_overlay)}_{sum(len(ds['df']) for ds in datasets_to_overlay)}"
+            if overlay_cache_key not in st.session_state:
+                st.session_state[overlay_cache_key] = create_overlay_map(datasets_to_overlay)
+
+            # Display map with returned_objects=[] to prevent rerendering
+            st_folium(st.session_state[overlay_cache_key], width=900, height=600, returned_objects=[])
+
+            st.info("💡 지도 우측 상단의 레이어 컨트롤을 사용하여 각 데이터셋을 개별적으로 켜고 끌 수 있습니다.")
+        else:
+            st.warning("⚠️ 좌표 정보가 있는 데이터셋이 없습니다.")
+
+    # Tab 2: Proximity Analysis (T034, T037-T041)
+    with analysis_tabs[1]:
+        st.subheader("📍 근접 분석")
+        st.markdown("""
+        두 데이터셋 간의 공간적 근접성을 분석합니다.
+        기준 데이터셋의 각 포인트에서 대상 데이터셋의 포인트가 특정 거리 내에 몇 개 있는지 계산합니다.
+        """)
+
+        if len(datasets_with_coords) < 2:
+            st.warning("⚠️ 근접 분석을 위해서는 좌표 정보가 있는 데이터셋이 최소 2개 필요합니다.")
+        else:
+            coord_dataset_names = list(datasets_with_coords.keys())
+
+            col1, col2 = st.columns(2)
+            with col1:
+                base_name = st.selectbox(
+                    "기준 데이터셋:",
+                    options=coord_dataset_names,
+                    key="proximity_base"
+                )
+            with col2:
+                target_options = [n for n in coord_dataset_names if n != base_name]
+                target_name = st.selectbox(
+                    "대상 데이터셋:",
+                    options=target_options,
+                    key="proximity_target"
+                )
+
+            # Threshold selection
+            st.markdown("**분석 거리 임계값 (km):**")
+            threshold_col1, threshold_col2, threshold_col3 = st.columns(3)
+            with threshold_col1:
+                t1 = st.number_input("임계값 1", value=0.5, min_value=0.1, max_value=10.0, step=0.1, key="t1")
+            with threshold_col2:
+                t2 = st.number_input("임계값 2", value=1.0, min_value=0.1, max_value=10.0, step=0.1, key="t2")
+            with threshold_col3:
+                t3 = st.number_input("임계값 3", value=2.0, min_value=0.1, max_value=10.0, step=0.1, key="t3")
+
+            thresholds = sorted([t1, t2, t3])
+
+            if st.button("🔍 근접 분석 실행", key="run_proximity"):
+                base_data = datasets_with_coords[base_name]
+                target_data = datasets_with_coords[target_name]
+
+                # Show progress
+                with st.spinner(f"'{base_name}'과(와) '{target_name}' 간의 근접 분석 중..."):
+                    try:
+                        # Run proximity analysis (T034)
+                        proximity_df = compute_proximity_stats(
+                            base_data['df'],
+                            base_data['lat_col'],
+                            base_data['lng_col'],
+                            target_data['df'],
+                            target_data['lat_col'],
+                            target_data['lng_col'],
+                            thresholds=thresholds
+                        )
+
+                        if proximity_df.empty:
+                            st.error("❌ 근접 분석 결과가 비어있습니다. 좌표 데이터를 확인해주세요.")
+                        else:
+                            # Display results table
+                            st.markdown("### 📊 근접 분석 결과")
+
+                            # Summary statistics
+                            summary_data = []
+                            for t in thresholds:
+                                t_str = str(t)
+                                if t_str in proximity_df.columns:
+                                    summary_data.append({
+                                        '거리 임계값': f"{t}km",
+                                        '평균': f"{proximity_df[t_str].mean():.2f}",
+                                        '중앙값': f"{proximity_df[t_str].median():.1f}",
+                                        '최소': f"{proximity_df[t_str].min():.0f}",
+                                        '최대': f"{proximity_df[t_str].max():.0f}",
+                                        '표준편차': f"{proximity_df[t_str].std():.2f}"
+                                    })
+
+                            st.dataframe(summary_data, use_container_width=True)
+
+                            # Natural language insights (T037)
+                            st.markdown("### 💡 분석 인사이트")
+                            for t in thresholds:
+                                t_str = str(t)
+                                if t_str in proximity_df.columns:
+                                    insight = summarize_proximity_stats(proximity_df, t_str, target_name)
+                                    st.markdown(f"**{t}km 반경:** {insight}")
+
+                            # Store results in session state for potential reuse
+                            st.session_state['last_proximity_result'] = proximity_df
+
+                    except Exception as e:
+                        st.error(f"❌ 근접 분석 중 오류 발생: {str(e)}")
+
+    # Tab 3: Distribution Comparison (T036, T038, T039)
+    with analysis_tabs[2]:
+        st.subheader("📈 분포 비교")
+        st.markdown("""
+        두 데이터셋의 숫자형 컬럼 분포를 비교합니다.
+        동일한 컬럼명을 가진 경우 직접 비교가 가능합니다.
+        """)
+
+        if len(selected_names) < 2:
+            st.warning("⚠️ 분포 비교를 위해서는 최소 2개의 데이터셋이 필요합니다.")
+        else:
+            # Select datasets to compare
+            col1, col2 = st.columns(2)
+            with col1:
+                compare_name1 = st.selectbox(
+                    "첫 번째 데이터셋:",
+                    options=selected_names,
+                    key="compare_ds1"
+                )
+            with col2:
+                compare_options2 = [n for n in selected_names if n != compare_name1]
+                compare_name2 = st.selectbox(
+                    "두 번째 데이터셋:",
+                    options=compare_options2,
+                    key="compare_ds2"
+                )
+
+            # Load datasets
+            df1 = load_dataset_from_session(available_options[compare_name1])
+            df2 = load_dataset_from_session(available_options[compare_name2])
+
+            if df1 is not None and df2 is not None:
+                # Find common numeric columns
+                numeric_cols1 = set(df1.select_dtypes(include=['number']).columns)
+                numeric_cols2 = set(df2.select_dtypes(include=['number']).columns)
+                common_numeric = list(numeric_cols1.intersection(numeric_cols2))
+
+                # Column selection
+                st.markdown("**비교할 컬럼 선택:**")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    all_numeric1 = list(df1.select_dtypes(include=['number']).columns)
+                    selected_col1 = st.selectbox(
+                        f"{compare_name1} 컬럼:",
+                        options=all_numeric1 if all_numeric1 else ["(숫자형 컬럼 없음)"],
+                        key="compare_col1"
+                    )
+                with col2:
+                    all_numeric2 = list(df2.select_dtypes(include=['number']).columns)
+                    # Default to same column if common
+                    default_idx = 0
+                    if selected_col1 in all_numeric2:
+                        default_idx = all_numeric2.index(selected_col1)
+                    selected_col2 = st.selectbox(
+                        f"{compare_name2} 컬럼:",
+                        options=all_numeric2 if all_numeric2 else ["(숫자형 컬럼 없음)"],
+                        index=default_idx if all_numeric2 else 0,
+                        key="compare_col2"
+                    )
+
+                if selected_col1 != "(숫자형 컬럼 없음)" and selected_col2 != "(숫자형 컬럼 없음)":
+                    # Display comparison chart
+                    st.markdown("### 📊 분포 비교 차트")
+
+                    # Create overlayed histogram
+                    fig = px.histogram(
+                        pd.DataFrame({
+                            f'{compare_name1} - {selected_col1}': df1[selected_col1].dropna(),
+                        }),
+                        title=f"분포 비교: {selected_col1} vs {selected_col2}",
+                        opacity=0.7,
+                        barmode='overlay'
+                    )
+
+                    # Add second histogram
+                    fig.add_trace(
+                        px.histogram(
+                            pd.DataFrame({
+                                f'{compare_name2} - {selected_col2}': df2[selected_col2].dropna(),
+                            }),
+                            opacity=0.7
+                        ).data[0]
+                    )
+
+                    fig.update_layout(
+                        xaxis_title="값",
+                        yaxis_title="빈도",
+                        legend_title="데이터셋",
+                        barmode='overlay'
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Distribution comparison insight
+                    st.markdown("### 💡 비교 인사이트")
+                    comparison_insight = compare_distributions(df1, selected_col1, df2, selected_col2)
+                    st.markdown(comparison_insight)
+
+                    # Individual distribution insights
+                    with st.expander("📝 개별 분포 분석", expanded=False):
+                        st.markdown(f"**{compare_name1} - {selected_col1}:**")
+                        st.markdown(generate_distribution_insight(df1, selected_col1))
+                        st.markdown(f"\n**{compare_name2} - {selected_col2}:**")
+                        st.markdown(generate_distribution_insight(df2, selected_col2))
+                else:
+                    st.info("ℹ️ 비교할 숫자형 컬럼이 없습니다.")
 
 
 def render_sidebar():
@@ -642,16 +1147,20 @@ def render_chatbot_tab():
         with col2:
             st.metric("컬럼 수", len(df.columns))
         with col3:
-            missing_pct = df.isnull().sum().sum() / (len(df) * len(df.columns)) * 100
+            total_cells = len(df) * len(df.columns)
+            missing_pct = (df.isnull().sum().sum() / total_cells * 100) if total_cells > 0 else 0
             st.metric("전체 결측률", f"{missing_pct:.1f}%")
         st.dataframe(df.head(3), use_container_width=True)
 
     st.markdown("---")
 
+    # T038: Get dataset-specific chat history
+    chat_history = get_chat_history(selected_dataset_key)
+
     # T049: Display conversation history
     st.subheader("대화 내역")
 
-    for msg in st.session_state.chatbot['messages']:
+    for msg in chat_history:
         with st.chat_message(msg['role']):
             st.markdown(msg['content'])
 
@@ -660,7 +1169,7 @@ def render_chatbot_tab():
 
     if user_question:
         # Add user message to history
-        st.session_state.chatbot['messages'].append({
+        chat_history.append({
             'role': 'user',
             'content': user_question
         })
@@ -669,54 +1178,53 @@ def render_chatbot_tab():
         with st.chat_message('user'):
             st.markdown(user_question)
 
-        # Generate response
+        # T047: Generate response with streaming
         with st.chat_message('assistant'):
-            with st.spinner("AI가 답변을 생성하고 있습니다..."):
-                try:
-                    # Create Anthropic client
-                    client = Anthropic(api_key=api_key)
+            try:
+                # Create Anthropic client
+                client = Anthropic(api_key=api_key)
 
-                    # Create data context
-                    data_context = create_data_context(df, selected_display_name)
+                # Create data context
+                data_context = create_data_context(df, selected_display_name)
 
-                    # Prepare messages for API
-                    api_messages = [
-                        {'role': m['role'], 'content': m['content']}
-                        for m in st.session_state.chatbot['messages']
-                    ]
+                # Prepare messages for API
+                api_messages = [
+                    {'role': m['role'], 'content': m['content']}
+                    for m in chat_history
+                ]
 
-                    # Get response
-                    response_text, usage = create_chat_response(
-                        client=client,
-                        model=st.session_state.chatbot['model'],
-                        messages=api_messages,
-                        data_context=data_context
-                    )
+                # T047: Stream response using st.write_stream
+                response_container = st.empty()
+                full_response = ""
 
-                    # Update token usage
-                    st.session_state.chatbot['tokens']['input'] += usage['input_tokens']
-                    st.session_state.chatbot['tokens']['output'] += usage['output_tokens']
-                    st.session_state.chatbot['tokens']['total'] += (
-                        usage['input_tokens'] + usage['output_tokens']
-                    )
+                stream_gen = stream_chat_response_with_tools(
+                    client=client,
+                    model=st.session_state.chatbot['model'],
+                    messages=api_messages,
+                    data_context=data_context,
+                    df=df
+                )
 
-                    # Display response
-                    st.markdown(response_text)
+                for chunk in stream_gen:
+                    full_response += chunk
+                    response_container.markdown(full_response + "▌")
 
-                    # Add assistant message to history
-                    st.session_state.chatbot['messages'].append({
-                        'role': 'assistant',
-                        'content': response_text
-                    })
+                response_container.markdown(full_response)
 
-                except Exception as e:
-                    error_msg = handle_chat_error(e)
-                    st.error(error_msg)
+                # Add assistant message to history
+                chat_history.append({
+                    'role': 'assistant',
+                    'content': full_response
+                })
 
-    # Clear conversation button
-    if st.session_state.chatbot['messages']:
+            except Exception as e:
+                error_msg = handle_chat_error(e)
+                st.error(error_msg)
+
+    # T039: Clear conversation button (dataset-specific)
+    if chat_history:
         if st.button("🗑️ 대화 내역 삭제", key="clear_chat"):
-            st.session_state.chatbot['messages'] = []
+            clear_chat_history(selected_dataset_key)
             st.rerun()
 
 
