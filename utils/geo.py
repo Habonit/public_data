@@ -123,7 +123,7 @@ def compute_proximity_stats(
     df_target: pd.DataFrame,
     target_lat_col: str,
     target_lng_col: str,
-    thresholds: list[float] = [0.5, 1.0, 2.0]
+    thresholds: list[float] | None = None
 ) -> pd.DataFrame:
     """
     Calculate proximity statistics between two datasets.
@@ -133,13 +133,17 @@ def compute_proximity_stats(
         base_lat_col, base_lng_col (str): Coordinate column names in df_base
         df_target (pd.DataFrame): Target dataset (e.g., CCTV data)
         target_lat_col, target_lng_col (str): Coordinate column names in df_target
-        thresholds (list[float]): Distance thresholds in kilometers (default: [0.5, 1.0, 2.0])
+        thresholds (list[float] | None): Distance thresholds in kilometers (default: [0.5, 1.0, 2.0])
 
     Returns:
         pd.DataFrame: Proximity counts
             - Rows: Each base point (sampled to max 5000 if needed)
             - Columns: One column per threshold with count of target points within that distance
     """
+    # Default thresholds
+    if thresholds is None:
+        thresholds = [0.5, 1.0, 2.0]
+
     # Sample df_base to 5000 rows if larger (for performance)
     if len(df_base) > 5000:
         df_base = df_base.sample(5000, random_state=42)

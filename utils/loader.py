@@ -1,9 +1,11 @@
 """
 Data loading utilities with encoding fallback and caching.
 """
+import io
 import os
 import pandas as pd
 import streamlit as st
+from typing import BinaryIO
 
 
 def read_csv_safe(file_path: str) -> pd.DataFrame:
@@ -38,6 +40,54 @@ def read_csv_safe(file_path: str) -> pd.DataFrame:
         f"Could not decode {file_path} with any supported encoding (tried: {', '.join(encodings)}). "
         f"Last error: {last_error}"
     )
+
+
+def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
+    """
+    Read uploaded CSV file with automatic encoding detection.
+
+    Parameters:
+        uploaded_file: Streamlit UploadedFile object (file-like binary object)
+
+    Returns:
+        pd.DataFrame: Loaded dataset
+
+    Raises:
+        ValueError: If file cannot be decoded with any supported encoding
+    """
+    encodings = ['utf-8', 'utf-8-sig', 'cp949']
+    last_error = None
+
+    # Read file content once
+    content = uploaded_file.read()
+
+    for enc in encodings:
+        try:
+            df = pd.read_csv(io.BytesIO(content), encoding=enc)
+            return df
+        except UnicodeDecodeError as e:
+            last_error = e
+            continue
+
+    raise ValueError(
+        f"Could not decode uploaded file with any supported encoding (tried: {', '.join(encodings)}). "
+        f"Last error: {last_error}"
+    )
+
+
+def load_dataset_from_session(dataset_name: str) -> pd.DataFrame | None:
+    """
+    Load dataset from session_state.
+
+    Parameters:
+        dataset_name (str): Dataset key (e.g., 'cctv', 'lights', etc.)
+
+    Returns:
+        pd.DataFrame | None: Dataset if uploaded, None otherwise
+    """
+    if 'datasets' not in st.session_state:
+        return None
+    return st.session_state.datasets.get(dataset_name)
 
 
 @st.cache_data

@@ -2,10 +2,42 @@
 Plotly charts and Folium maps generation.
 """
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 import folium
 from folium.plugins import MarkerCluster
+
+
+# Color palette for consistent styling (T034, T035)
+PLOT_COLORS = {
+    'primary': '#1f77b4',
+    'secondary': '#ff7f0e',
+    'tertiary': '#2ca02c',
+    'histogram': '#636EFA',
+    'boxplot': '#EF553B',
+    'kde': '#00CC96',
+    'scatter': '#AB63FA'
+}
+
+
+def check_missing_ratio(df: pd.DataFrame, column: str, threshold: float = 0.3) -> tuple[bool, float]:
+    """
+    Check if column has missing values above threshold. (T032)
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        column (str): Column name to check
+        threshold (float): Missing ratio threshold (default: 0.3 = 30%)
+
+    Returns:
+        tuple[bool, float]: (is_above_threshold, actual_ratio)
+    """
+    missing_count = df[column].isnull().sum()
+    total_count = len(df)
+    ratio = missing_count / total_count if total_count > 0 else 0.0
+    return (ratio >= threshold, ratio)
 
 
 def plot_numeric_distribution(df: pd.DataFrame, column: str, title: str | None = None) -> go.Figure:
@@ -89,11 +121,177 @@ def plot_categorical_distribution(df: pd.DataFrame, column: str, title: str | No
     return fig
 
 
+def plot_boxplot(df: pd.DataFrame, column: str, title: str | None = None) -> go.Figure:
+    """
+    Create boxplot for numeric column distribution. (T025)
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        column (str): Numeric column name
+        title (str | None): Optional chart title
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive boxplot
+    """
+    missing_count = df[column].isnull().sum()
+
+    if title is None:
+        title = f"Boxplot of {column}"
+        if missing_count > 0:
+            title += f" ({missing_count} missing values)"
+
+    fig = px.box(
+        df.dropna(subset=[column]),
+        y=column,
+        title=title,
+        color_discrete_sequence=[PLOT_COLORS['boxplot']]
+    )
+
+    fig.update_layout(
+        showlegend=False,
+        hovermode='y unified'
+    )
+
+    return fig
+
+
+def plot_kde(df: pd.DataFrame, column: str, title: str | None = None) -> go.Figure:
+    """
+    Create KDE (Kernel Density Estimation) plot for numeric column. (T026)
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        column (str): Numeric column name
+        title (str | None): Optional chart title
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive KDE plot
+    """
+    data = df[column].dropna().values
+    missing_count = df[column].isnull().sum()
+
+    if title is None:
+        title = f"KDE of {column}"
+        if missing_count > 0:
+            title += f" ({missing_count} missing values)"
+
+    # Check if we have enough data points
+    if len(data) < 2:
+        # Return empty figure with message
+        fig = go.Figure()
+        fig.add_annotation(
+            text="데이터가 부족하여 KDE를 생성할 수 없습니다",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False
+        )
+        fig.update_layout(title=title)
+        return fig
+
+    try:
+        # Create distplot with KDE
+        fig = ff.create_distplot(
+            [data],
+            [column],
+            show_hist=True,
+            show_rug=False,
+            colors=[PLOT_COLORS['kde']]
+        )
+        fig.update_layout(
+            title=title,
+            showlegend=False
+        )
+    except Exception:
+        # Fallback to histogram if distplot fails
+        fig = px.histogram(
+            df.dropna(subset=[column]),
+            x=column,
+            title=title,
+            histnorm='probability density',
+            color_discrete_sequence=[PLOT_COLORS['kde']]
+        )
+
+    return fig
+
+
+def plot_scatter(
+    df: pd.DataFrame,
+    x_column: str,
+    y_column: str,
+    title: str | None = None
+) -> go.Figure:
+    """
+    Create scatter plot for two numeric columns. (T027)
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        x_column (str): X-axis numeric column name
+        y_column (str): Y-axis numeric column name
+        title (str | None): Optional chart title
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive scatter plot
+    """
+    if title is None:
+        title = f"{x_column} vs {y_column}"
+
+    # Drop rows where either column is missing
+    df_clean = df.dropna(subset=[x_column, y_column])
+
+    fig = px.scatter(
+        df_clean,
+        x=x_column,
+        y=y_column,
+        title=title,
+        color_discrete_sequence=[PLOT_COLORS['scatter']],
+        opacity=0.6
+    )
+
+    fig.update_layout(
+        hovermode='closest'
+    )
+
+    return fig
+
+
+def plot_with_options(
+    df: pd.DataFrame,
+    column: str,
+    chart_type: str = 'histogram',
+    y_column: str | None = None,
+    title: str | None = None
+) -> go.Figure:
+    """
+    Create chart based on chart type selection. (T028)
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        column (str): Primary column name
+        chart_type (str): One of 'histogram', 'boxplot', 'kde', 'scatter'
+        y_column (str | None): Y column for scatter plot
+        title (str | None): Optional chart title
+
+    Returns:
+        plotly.graph_objects.Figure: Interactive chart
+    """
+    if chart_type == 'histogram':
+        return plot_numeric_distribution(df, column, title)
+    elif chart_type == 'boxplot':
+        return plot_boxplot(df, column, title)
+    elif chart_type == 'kde':
+        return plot_kde(df, column, title)
+    elif chart_type == 'scatter':
+        if y_column is None:
+            raise ValueError("scatter plot requires y_column")
+        return plot_scatter(df, column, y_column, title)
+    else:
+        raise ValueError(f"Unknown chart type: {chart_type}")
+
+
 def create_folium_map(
     df: pd.DataFrame,
     lat_col: str,
     lng_col: str,
-    popup_cols: list[str] = [],
+    popup_cols: list[str] | None = None,
     color: str = 'blue',
     name: str = 'Points',
     icon: str = 'info-sign'
