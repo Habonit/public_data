@@ -1,6 +1,7 @@
 """
 Anthropic Claude chatbot module for data Q&A.
 """
+import time
 import pandas as pd
 from anthropic import Anthropic, APIError, APIConnectionError, RateLimitError
 from utils.tools import TOOLS, execute_tool
@@ -335,22 +336,65 @@ def stream_chat_response_with_tools(
                 final_text = current_text
                 break
 
-            yield "\n\n*도구를 실행 중입니다...*\n\n"
+            # v1.1.2: Yield tool execution start event
+            total_tools = len(tool_uses)
+            yield {'__tool_batch_start__': {'total': total_tools}}
 
             tool_results = []
-            for tool_use in tool_uses:
+            for idx, tool_use in enumerate(tool_uses, 1):
+                # Yield tool start event
+                tool_start_time = time.time()
+                yield {'__tool_start__': {'name': tool_use.name, 'index': idx, 'total': total_tools}}
+
                 result = execute_tool(tool_use.name, tool_use.input, df)
+
+                # Yield tool end event
+                elapsed = time.time() - tool_start_time
+                yield {'__tool_end__': {'name': tool_use.name, 'index': idx, 'total': total_tools, 'elapsed': elapsed}}
+
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tool_use.id,
                     "content": str(result)
                 })
 
+            # Yield tool batch complete event
+            yield {'__tool_batch_end__': {'total': total_tools}}
+
             working_messages.append({"role": "assistant", "content": final_message.content})
             working_messages.append({"role": "user", "content": tool_results})
 
+    # v1.1.2: LLM fallback when tools fail to provide a response
     if not final_text and iteration == MAX_TOOL_ITERATIONS - 1:
-        final_text = "현재 앱이 답변할 수 없는 질문입니다. 질문을 더 구체적으로 해주세요."
-        yield final_text
+        yield {'__fallback_start__': True}
+        try:
+            # Attempt direct LLM response without tools
+            fallback_system = f"""{SYSTEM_PROMPT}
 
-    return {'text': final_text, 'usage': total_usage}
+{data_context}
+
+주의: 데이터 분석 도구를 사용할 수 없습니다. 데이터셋 정보를 기반으로 가능한 범위 내에서 답변해주세요.
+정확한 수치가 필요한 질문에는 "정확한 분석을 위해 더 구체적인 질문을 해주세요"라고 안내하세요."""
+
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=fallback_system,
+                messages=messages
+            ) as fallback_stream:
+                for text in fallback_stream.text_stream:
+                    final_text += text
+                    yield text
+
+                fallback_message = fallback_stream.get_final_message()
+                total_usage['input_tokens'] += fallback_message.usage.input_tokens
+                total_usage['output_tokens'] += fallback_message.usage.output_tokens
+
+        except Exception:
+            final_text = "현재 앱이 답변할 수 없는 질문입니다. 질문을 더 구체적으로 해주세요."
+            yield final_text
+
+        yield {'__fallback_end__': True}
+
+    # Yield usage info as special dict at the end (T046 v1.1.2)
+    yield {'__usage__': total_usage, '__text__': final_text}
