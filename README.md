@@ -210,6 +210,47 @@ streamlit run app.py
 
 ---
 
+## 프로젝트 구조
+
+```
+public_data/
+├── app.py                 # Streamlit 메인 앱
+├── requirements.txt       # Python 의존성
+├── syllabus.md           # 15일 교육과정 커리큘럼
+├── data/                  # 대구 공공데이터 CSV
+│   ├── train.csv
+│   ├── test.csv
+│   ├── countrywide_accident.csv
+│   ├── 대구 CCTV 정보.csv
+│   ├── 대구 보안등 정보.csv
+│   ├── 대구 어린이 보호 구역 정보.csv
+│   └── 대구 주차장 정보.csv
+├── utils/                 # 유틸리티 모듈
+│   ├── chatbot.py        # AI 챗봇 로직
+│   ├── tools.py          # Tool Calling 도구
+│   ├── visualizer.py     # Plotly 시각화
+│   ├── geo.py            # Folium 지도
+│   ├── loader.py         # 데이터 로더
+│   └── narration.py      # 나레이션
+├── docs/                  # 버전별 문서
+│   ├── constitution.md
+│   ├── v1.0/, v1.1/, v1.1.1/, v1.1.2/, v1.1.3/
+├── specs/                 # SDD 스펙 산출물
+│   ├── 001-daegu-data-viz/
+│   ├── 002-app-v1-1-upgrade/
+│   └── 003-app-v111-upgrade/
+└── material/              # 일차별 학습 자료
+    ├── 1-3/              # 1~3일차
+    ├── 3-7/              # 3~7일차
+    ├── 8-10/             # 8~10일차
+    ├── 11-12/            # 11~12일차
+    ├── 13/               # 13일차
+    ├── 14/               # 14일차
+    └── 15/               # 15일차
+```
+
+---
+
 ## 문서
 
 | 문서 | 설명 |
@@ -222,4 +263,40 @@ streamlit run app.py
 | `specs/001-daegu-data-viz/` | v1.0 스펙 산출물 (spec, plan, tasks) |
 | `specs/002-app-v1-1-upgrade/` | v1.1 스펙 산출물 |
 | `specs/003-app-v111-upgrade/` | v1.1.1 스펙 산출물 |
-| `streamlit_study/` | Streamlit 학습 예제 (01~14번) |
+| `material/` | 일차별 학습 자료 (아래 참조) |
+| `syllabus.md` | 전체 15일 커리큘럼 문서 |
+
+---
+
+## 학습 자료 (material/)
+
+15일 교육과정의 일차별 학습 자료입니다. 전체 커리큘럼은 `syllabus.md`를 참조하세요.
+
+### 커리큘럼 개요
+
+```
+Phase 1: 데이터 분석 기초 (1~4일차)
+Phase 2: Streamlit 앱 개발 (5~10일차)
+Phase 3: AI 챗봇 통합 (11~15일차)
+```
+
+### 일차별 학습 내용
+
+| 디렉토리 | 일차 | 핵심 내용 |
+|:---------|:-----|:----------|
+| `material/1-3/` | 1~3일차 | 파이썬 기초, 데이터 분석, EDA, 예측 모델 구축 |
+| `material/3-7/` | 3~7일차 | Pandas, Plotly, AutoML, 가드레일 모델, 대구 공공데이터 검증 |
+| `material/8-10/` | 8~10일차 | Streamlit 기초~고급, Folium 지도, 대시보드 구현 |
+| `material/11-12/` | 11~12일차 | SDD 방법론, LangChain, Claude API |
+| `material/13/` | 13일차 | Anthropic Tool Calling (정의, 실행, 다중 도구) |
+| `material/14/` | 14일차 | LangGraph 대화 메모리 (Buffer, Window, Summary, Hybrid) |
+| `material/15/` | 15일차 | LangGraph 메모리 + Tool Calling 통합 |
+
+### 학습 흐름
+
+```
+[데이터 분석 기초] → [Streamlit 앱 개발] → [AI 챗봇 통합]
+      ↓                    ↓                    ↓
+  CSV 분석            시각화 앱            Tool Calling
+  EDA, 모델          Plotly, Folium       LangGraph 메모리
+```
