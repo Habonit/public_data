@@ -166,6 +166,11 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 - 코드 예시: 원본 유지
 - 기술 용어 및 명령어: 원문 (예: `streamlit run`, `git commit`)
 
+### 7 브랜치 전략
+- spec 문서를 만들 때의 이름으로 브랜치를 쓰지 않는다
+- 무조건 버전 이름으로만 브랜치를 딴다.
+- 형태 version/v{실제 버전}
+
 ---
 
 ## Document History
@@ -174,4 +179,5 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 |------|----------|------|
 | v1.0 | `docs/v1.0/daegu_constitution.md` | Spec 주도 개발(SDD)에서 최초 생성된 Constitution |
 | v1.1 | `docs/constitution.md` | #1 ~ #6까지 constitution에 반영 | 
+| v1.2.4 | `docs/constitution.md` | #7까지 constitution에 반영 | 
 

@@ -58,12 +58,19 @@ def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
     encodings = ['utf-8', 'utf-8-sig', 'cp949']
     last_error = None
 
+    # 파일 포인터를 처음으로 리셋 (재업로드 시 문제 방지)
+    uploaded_file.seek(0)
+
     # Read file content once
     content = uploaded_file.read()
 
     for enc in encodings:
         try:
-            df = pd.read_csv(io.BytesIO(content), encoding=enc)
+            df = pd.read_csv(
+                io.BytesIO(content),
+                encoding=enc,
+                header=0  # 첫 행을 헤더로 명시적 지정
+            )
             return df
         except UnicodeDecodeError as e:
             last_error = e
