@@ -1032,8 +1032,9 @@ def render_chatbot_tab():
         st.error("데이터를 불러올 수 없습니다.")
         return
 
-    # Show dataset summary
-    with st.expander("📊 데이터셋 요약", expanded=False):
+    # v1.2.4: 데이터셋 요약 - 선택된 데이터셋 기반으로 갱신
+    # key에 데이터셋 키를 포함하여 데이터셋 변경 시 expander가 갱신되도록 함
+    with st.expander(f"📊 데이터셋 요약 ({selected_display_name})", expanded=False):
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("행 수", f"{len(df):,}")
@@ -1043,7 +1044,8 @@ def render_chatbot_tab():
             total_cells = len(df) * len(df.columns)
             missing_pct = (df.isnull().sum().sum() / total_cells * 100) if total_cells > 0 else 0
             st.metric("전체 결측률", f"{missing_pct:.1f}%")
-        st.dataframe(df.head(3), width='stretch')
+        # v1.2.4: 샘플 데이터 10개로 변경
+        st.dataframe(df.head(10), use_container_width=True)
 
     st.markdown("---")
 
