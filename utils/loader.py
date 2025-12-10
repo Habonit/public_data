@@ -77,6 +77,11 @@ def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
                 header=0,  # 첫 행을 헤더로 명시적 지정
                 skipinitialspace=True  # v1.2.5: 공백 제거
             )
+            
+            # v1.2.5: test_data만 최상단에 Column{숫자} 형태로 컬럼명이 있어서 수정
+            if any("column" in str(col).lower() for col in df.columns):
+                df.columns = df.iloc[0]
+                df = df[1:].reset_index(drop=True)
 
             # v1.2.5: 헤더 검증 - 모든 컬럼이 숫자 또는 "column{숫자}" 형태면 헤더 인식 실패로 판단
             def is_invalid_header(col_name):
