@@ -36,6 +36,8 @@ from utils.chatbot import (
     handle_chat_error,
     validate_api_key
 )
+# v1.2.5: detect_report_intent는 향후 보고서 생성 의도 감지에 사용 예정
+# from utils.prompts import detect_report_intent
 from anthropic import Anthropic
 
 # v1.2: 버전 히스토리 상수
@@ -1139,6 +1141,22 @@ def render_chatbot_tab():
 
                 if used_fallback:
                     st.caption("💡 도구 기반 분석이 어려워 일반 응답으로 전환되었습니다.")
+
+                # v1.2.5: 보고서 마크다운 다운로드 버튼
+                # 응답에 마크다운 헤더가 있으면 보고서로 판단
+                if full_response and ('# ' in full_response or '## ' in full_response):
+                    # 보고서 파일명 생성
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"report_{selected_display_name}_{timestamp}.md"
+
+                    st.download_button(
+                        label="📥 마크다운 다운로드",
+                        data=full_response,
+                        file_name=filename,
+                        mime="text/markdown",
+                        key=f"download_{timestamp}"
+                    )
 
                 # Add assistant message to history
                 chat_history.append({
