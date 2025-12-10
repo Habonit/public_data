@@ -464,13 +464,14 @@ public_data/
 │   ├── 003-app-v111-upgrade/
 │   └── 004-app-v12-upgrade/
 └── material/              # 일차별 학습 자료
-    ├── 1-3/              # 1~3일차
-    ├── 3-7/              # 3~7일차
-    ├── 8-10/             # 8~10일차
+    ├── 01-03/            # 1~3일차
+    ├── 03-07/            # 3~7일차
+    ├── 08-10/            # 8~10일차
     ├── 11-12/            # 11~12일차
     ├── 13/               # 13일차
     ├── 14/               # 14일차
-    └── 15/               # 15일차
+    ├── 15/               # 15일차
+    └── 16-20/            # 16~20일차 (예정)
 ```
 
 ---
@@ -514,9 +515,9 @@ Phase 3: AI 챗봇 통합 (11~15일차)
 
 | 디렉토리 | 일차 | 핵심 내용 |
 |:---------|:-----|:----------|
-| `material/1-3/` | 1~3일차 | 파이썬 기초, 데이터 분석, EDA, 예측 모델 구축 |
-| `material/3-7/` | 3~7일차 | Pandas, Plotly, AutoML, 가드레일 모델, 대구 공공데이터 검증 |
-| `material/8-10/` | 8~10일차 | Streamlit 기초~고급, Folium 지도, 대시보드 구현 |
+| `material/01-03/` | 1~3일차 | 파이썬 기초, 데이터 분석, EDA, 예측 모델 구축 |
+| `material/03-07/` | 3~7일차 | Pandas, Plotly, AutoML, 가드레일 모델, 대구 공공데이터 검증 |
+| `material/08-10/` | 8~10일차 | Streamlit 기초~고급, Folium 지도, 대시보드 구현 |
 | `material/11-12/` | 11~12일차 | SDD 방법론, LangChain, Claude API |
 | `material/13/` | 13일차 | Anthropic Tool Calling (정의, 실행, 다중 도구) |
 | `material/14/` | 14일차 | LangGraph 대화 메모리 (Buffer, Window, Summary, Hybrid) |

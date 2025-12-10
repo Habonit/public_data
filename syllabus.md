@@ -351,9 +351,9 @@ Summary: START → chatbot ↔ tools → summarizer → END
 
 | 일차 | 경로 |
 |:-----|:-----|
-| 1~3일차 | `material/1-3/` |
-| 3~7일차 | `material/3-7/` |
-| 8~10일차 | `material/8-10/` |
+| 1~3일차 | `material/01-03/` |
+| 3~7일차 | `material/03-07/` |
+| 8~10일차 | `material/08-10/` |
 | 11~12일차 | `material/11-12/` |
 | 13일차 | `material/13/` |
 | 14일차 | `material/14/` |
