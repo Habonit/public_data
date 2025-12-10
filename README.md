@@ -36,7 +36,38 @@ streamlit run app.py
 
 ## 버전 히스토리
 
-### v1.2.5 (현재)
+### v1.2.6 (현재)
+
+**Tool Calling 버그 수정 및 UX 개선** - execute_tool config 전달 방식 수정, AI 응답 복사 버튼 추가
+
+#### 주요 변경사항
+
+| 영역 | v1.2.5 | v1.2.6 |
+|:-----|:-------|:-------|
+| **Tool Calling** | ⚠️ config 전달 오류 | ✅ LangChain @tool 호환 방식으로 수정 |
+| **AI 응답 복사** | 마크다운 다운로드 버튼 | JavaScript 클립보드 복사 버튼 |
+
+#### 버그 수정 (P0)
+
+- **execute_tool config 전달 방식 수정** (`utils/tools.py`)
+  - 문제: `tool_func.invoke({**tool_input, "config": config})` 방식으로 config가 input dict에 병합됨
+  - 원인: LangChain `@tool` 데코레이터는 config를 별도 키워드 인자로 받아야 함
+  - 해결: `tool_func.invoke(tool_input, config=config)` 형태로 변경
+  - 영향: 22개 도구 모두 정상 작동 (`get_sample_rows`, `get_dataframe_info` 등)
+
+#### UX 개선 (P1)
+
+- **AI 응답 복사 버튼 추가** (`app.py`)
+  - 마크다운 다운로드 버튼 → JavaScript 클립보드 복사 버튼으로 변경
+  - 모든 AI 응답에 "📋 복사" 버튼 표시
+  - 클릭 시 "✅ 복사됨!" 피드백 (2초 후 원복)
+  - `html.escape()` 및 `navigator.clipboard.writeText()` 사용
+
+기준 문서: `docs/v1.2.6/app_improvement_proposal.md`
+
+---
+
+### v1.2.5
 
 **버그 재수정 및 기능 추가** - test_data 헤더 인식 완전 해결, AI 보고서 생성, material 폴더 표준화
 
