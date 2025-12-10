@@ -54,8 +54,13 @@ def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
 
     Raises:
         ValueError: If file cannot be decoded with any supported encoding
+
+    Note:
+        v1.2.5: BOM 처리를 위해 utf-8-sig를 최우선으로 변경.
+        헤더 검증 로직 추가하여 숫자 인덱스 컬럼명 문제 해결.
     """
-    encodings = ['utf-8', 'utf-8-sig', 'cp949']
+    # v1.2.5: utf-8-sig를 최우선으로 (BOM 처리)
+    encodings = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
     last_error = None
 
     # 파일 포인터를 처음으로 리셋 (재업로드 시 문제 방지)
@@ -69,8 +74,30 @@ def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
             df = pd.read_csv(
                 io.BytesIO(content),
                 encoding=enc,
-                header=0  # 첫 행을 헤더로 명시적 지정
+                header=0,  # 첫 행을 헤더로 명시적 지정
+                skipinitialspace=True  # v1.2.5: 공백 제거
             )
+
+            # v1.2.5: 헤더 검증 - 모든 컬럼이 숫자 또는 "column{숫자}" 형태면 헤더 인식 실패로 판단
+            def is_invalid_header(col_name):
+                col_str = str(col_name)
+                # 숫자로만 구성된 경우
+                if col_str.isdigit():
+                    return True
+                # "column{숫자}" 형태인 경우 (예: column0, column1, ...)
+                if col_str.startswith('column') and col_str[6:].isdigit():
+                    return True
+                # "Unnamed: {숫자}" 형태인 경우
+                if col_str.startswith('Unnamed:'):
+                    return True
+                return False
+
+            if all(is_invalid_header(col) for col in df.columns):
+                # 첫 행을 헤더로 재설정
+                if len(df) > 0:
+                    df.columns = df.iloc[0].astype(str)
+                    df = df[1:].reset_index(drop=True)
+
             return df
         except UnicodeDecodeError as e:
             last_error = e
