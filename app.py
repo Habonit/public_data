@@ -1142,21 +1142,36 @@ def render_chatbot_tab():
                 if used_fallback:
                     st.caption("💡 도구 기반 분석이 어려워 일반 응답으로 전환되었습니다.")
 
-                # v1.2.5: 보고서 마크다운 다운로드 버튼
-                # 응답에 마크다운 헤더가 있으면 보고서로 판단
-                if full_response and ('# ' in full_response or '## ' in full_response):
-                    # 보고서 파일명 생성
+                # v1.2.6: 모든 AI 응답에 복사 버튼 추가
+                if full_response:
                     from datetime import datetime
+                    import html
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"report_{selected_display_name}_{timestamp}.md"
 
-                    st.download_button(
-                        label="📥 마크다운 다운로드",
-                        data=full_response,
-                        file_name=filename,
-                        mime="text/markdown",
-                        key=f"download_{timestamp}"
-                    )
+                    # JavaScript를 사용한 클립보드 복사
+                    escaped_response = html.escape(full_response).replace('\n', '\\n').replace("'", "\\'")
+                    copy_js = f"""
+                    <script>
+                    function copyToClipboard_{timestamp}() {{
+                        const text = '{escaped_response}'.replace(/\\\\n/g, '\\n');
+                        navigator.clipboard.writeText(text).then(function() {{
+                            document.getElementById('copy-btn-{timestamp}').innerText = '✅ 복사됨!';
+                            setTimeout(function() {{
+                                document.getElementById('copy-btn-{timestamp}').innerText = '📋 복사';
+                            }}, 2000);
+                        }});
+                    }}
+                    </script>
+                    <button id="copy-btn-{timestamp}" onclick="copyToClipboard_{timestamp}()" style="
+                        background-color: #f0f2f6;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        padding: 4px 12px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">📋 복사</button>
+                    """
+                    st.components.v1.html(copy_js, height=40)
 
                 # Add assistant message to history
                 chat_history.append({
