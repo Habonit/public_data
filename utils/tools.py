@@ -1174,7 +1174,7 @@ def execute_tool(tool_name: str, tool_input: dict, df: pd.DataFrame) -> str:
         config = {"configurable": {"dataframe": df, "current_dataset": ""}}
         tool_func = tools_map[tool_name]
 
-        # 도구 호출
-        return tool_func.invoke({**tool_input, "config": config})
+        # v1.2.6: config를 별도 인자로 전달 (LangChain @tool 데코레이터 호환)
+        return tool_func.invoke(tool_input, config=config)
     except Exception as e:
         return f"도구 실행 중 오류가 발생했습니다: {str(e)}"
