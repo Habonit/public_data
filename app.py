@@ -6,6 +6,7 @@ Provides individual dataset exploration, cross-dataset spatial analysis, and
 educational content to help data analysis learners discover insights independently.
 """
 import io
+import re
 import time
 import streamlit as st
 import pandas as pd
@@ -81,6 +82,7 @@ VERSION_HISTORY = [
 ]
 
 # v1.2: AI 챗봇 아키텍처 정보
+# v1.2.7: 22개 도구로 업데이트, 각 도구에 상세 설명 추가
 CHATBOT_ARCHITECTURE = {
     "workflow": {
         "name": "LangGraph StateGraph",
@@ -88,27 +90,138 @@ CHATBOT_ARCHITECTURE = {
         "description": "조건부 라우팅 기반 Tool Calling 워크플로우"
     },
     "tools": [
-        {"name": "describe_column", "category": "기본 분석", "description": "컬럼 기초 통계"},
-        {"name": "get_value_counts", "category": "기본 분석", "description": "값 빈도 분석"},
-        {"name": "calculate_correlation", "category": "기본 분석", "description": "상관계수 계산"},
-        {"name": "detect_outliers", "category": "기본 분석", "description": "이상치 탐지"},
-        {"name": "get_missing_info", "category": "기본 분석", "description": "결측값 정보"},
-        {"name": "filter_data", "category": "필터링", "description": "조건부 필터링"},
-        {"name": "filter_by_value", "category": "필터링", "description": "값 기반 필터링"},
-        {"name": "filter_by_range", "category": "필터링", "description": "범위 필터링"},
-        {"name": "group_statistics", "category": "집계", "description": "그룹별 통계"},
-        {"name": "aggregate_data", "category": "집계", "description": "데이터 집계"},
-        {"name": "get_top_n", "category": "집계", "description": "상위 N개 추출"},
-        {"name": "get_unique_values", "category": "집계", "description": "고유값 목록"},
-        {"name": "compare_groups", "category": "비교", "description": "그룹 비교"},
-        {"name": "cross_tabulation", "category": "비교", "description": "교차표 분석"},
-        {"name": "time_series_analysis", "category": "시계열", "description": "시계열 분석"},
-        {"name": "calculate_growth_rate", "category": "시계열", "description": "증감률 계산"},
-        {"name": "pivot_table", "category": "고급", "description": "피벗 테이블"},
-        {"name": "sample_data", "category": "고급", "description": "샘플 추출"},
-        {"name": "get_column_info", "category": "고급", "description": "컬럼 상세 정보"},
-        {"name": "search_data", "category": "고급", "description": "데이터 검색"},
-        {"name": "predict_eclo", "category": "예측", "description": "ECLO 사고 심각도 예측"}
+        {
+            "name": "get_dataframe_info",
+            "category": "기본 정보",
+            "description": "DataFrame 기본 정보 조회",
+            "detail": "데이터프레임의 행/열 수, 컬럼명, 데이터 타입을 조회합니다. 메모리 사용량과 비결측치 개수도 함께 확인할 수 있습니다. 데이터 탐색의 첫 단계로 전체 구조를 파악할 때 유용합니다."
+        },
+        {
+            "name": "get_column_statistics",
+            "category": "통계 분석",
+            "description": "컬럼 통계량 계산",
+            "detail": "특정 컬럼의 평균, 표준편차, 최소/최대값, 사분위수를 계산합니다. 수치형 데이터의 분포 특성을 파악하는 데 필수적인 도구입니다. 데이터의 중심 경향과 산포도를 빠르게 이해할 수 있습니다."
+        },
+        {
+            "name": "get_missing_values",
+            "category": "결측치 분석",
+            "description": "결측치 현황 조회",
+            "detail": "전체 데이터프레임의 컬럼별 결측치 개수와 비율을 보여줍니다. 데이터 품질 평가와 전처리 전략 수립에 중요한 정보를 제공합니다. 어떤 컬럼에 집중적으로 결측이 발생했는지 파악할 수 있습니다."
+        },
+        {
+            "name": "get_value_counts",
+            "category": "값 분포",
+            "description": "값 빈도 분석",
+            "detail": "특정 컬럼의 각 값이 몇 번 나타나는지 빈도를 계산합니다. 범주형 데이터의 분포를 파악하거나 이상값을 발견하는 데 유용합니다. 상위 N개 값만 선택적으로 조회할 수도 있습니다."
+        },
+        {
+            "name": "filter_dataframe",
+            "category": "데이터 필터링",
+            "description": "조건부 데이터 필터링",
+            "detail": "특정 조건에 맞는 행만 추출합니다. 비교 연산자(==, !=, >, <, >=, <=)와 값을 지정하여 필터링합니다. 복잡한 분석 전 관심 데이터만 선별할 때 사용합니다."
+        },
+        {
+            "name": "sort_dataframe",
+            "category": "데이터 정렬",
+            "description": "데이터 정렬",
+            "detail": "하나 이상의 컬럼을 기준으로 데이터를 오름차순 또는 내림차순 정렬합니다. 상위/하위 값을 빠르게 확인하거나 패턴을 발견하는 데 유용합니다. 정렬 후 상위 N개 행만 반환할 수도 있습니다."
+        },
+        {
+            "name": "get_correlation",
+            "category": "상관관계",
+            "description": "상관계수 계산",
+            "detail": "수치형 컬럼들 간의 피어슨 상관계수를 계산합니다. 변수들 사이의 선형 관계 강도와 방향을 파악할 수 있습니다. 특정 컬럼들만 선택하거나 전체 수치형 컬럼에 대해 계산 가능합니다."
+        },
+        {
+            "name": "group_by_aggregate",
+            "category": "그룹별 집계",
+            "description": "그룹별 집계 분석",
+            "detail": "하나 이상의 컬럼으로 그룹화하여 집계 통계를 계산합니다. sum, mean, count, min, max 등 다양한 집계 함수를 지원합니다. 카테고리별 비교 분석이나 요약 통계 생성에 필수적입니다."
+        },
+        {
+            "name": "get_unique_values",
+            "category": "고유값 조회",
+            "description": "고유값 목록 조회",
+            "detail": "특정 컬럼의 모든 고유값(중복 제거)을 반환합니다. 범주형 데이터의 전체 카테고리를 파악하는 데 유용합니다. 데이터 검증이나 필터 옵션 설정에 활용할 수 있습니다."
+        },
+        {
+            "name": "get_date_range",
+            "category": "날짜 범위",
+            "description": "날짜 범위 조회",
+            "detail": "날짜 컬럼의 최소값과 최대값을 반환합니다. 데이터의 시간적 범위와 기간을 빠르게 파악할 수 있습니다. 시계열 분석 전 데이터 커버리지를 확인하는 데 유용합니다."
+        },
+        {
+            "name": "get_outliers",
+            "category": "이상치 탐지",
+            "description": "이상치 탐지",
+            "detail": "IQR(사분위수 범위) 방법으로 이상치를 탐지합니다. 지정된 배수(기본 1.5)를 기준으로 Q1-IQR*k 미만, Q3+IQR*k 초과 값을 이상치로 판단합니다. 데이터 정제 전 이상값 파악에 필수적입니다."
+        },
+        {
+            "name": "get_sample_rows",
+            "category": "샘플 데이터",
+            "description": "샘플 데이터 추출",
+            "detail": "데이터프레임에서 무작위 또는 순차적으로 샘플 행을 추출합니다. 대용량 데이터의 실제 모습을 빠르게 확인할 때 유용합니다. 데이터 구조와 값의 형태를 직관적으로 파악할 수 있습니다."
+        },
+        {
+            "name": "calculate_percentile",
+            "category": "백분위 계산",
+            "description": "백분위수 계산",
+            "detail": "특정 컬럼에서 지정된 백분위에 해당하는 값을 계산합니다. 데이터 분포에서 특정 위치의 값을 파악할 때 유용합니다. 중앙값(50%), 상위 10%(90%) 등 다양한 분위수를 조회할 수 있습니다."
+        },
+        {
+            "name": "get_geo_bounds",
+            "category": "지리 범위",
+            "description": "지리 좌표 범위 조회",
+            "detail": "위도/경도 컬럼의 최소/최대 범위를 반환합니다. 데이터의 지리적 커버리지를 파악하는 데 유용합니다. 지도 시각화 전 적절한 줌 레벨과 중심점을 결정할 때 활용됩니다."
+        },
+        {
+            "name": "cross_tabulation",
+            "category": "교차 분석",
+            "description": "교차표 분석",
+            "detail": "두 범주형 컬럼 간의 교차표(크로스탭)를 생성합니다. 두 변수 간의 관계와 빈도 분포를 2차원 표로 확인할 수 있습니다. 범주형 변수들의 조합별 패턴을 발견하는 데 효과적입니다."
+        },
+        {
+            "name": "analyze_missing_pattern",
+            "category": "결측 패턴",
+            "description": "결측치 패턴 분석",
+            "detail": "특정 컬럼의 결측치 패턴을 다른 컬럼과 연관지어 분석합니다. 결측이 무작위인지 특정 조건에서 발생하는지 파악할 수 있습니다. 데이터 품질 문제의 원인을 진단하는 데 도움이 됩니다."
+        },
+        {
+            "name": "get_column_correlation_with_target",
+            "category": "타겟 상관관계",
+            "description": "타겟 변수와의 상관관계",
+            "detail": "지정된 타겟 컬럼과 다른 모든 수치형 컬럼 간의 상관계수를 계산합니다. 예측 모델링 전 중요 변수를 선별하는 데 유용합니다. 상관계수 절대값 순으로 정렬하여 가장 관련 있는 변수를 파악합니다."
+        },
+        {
+            "name": "detect_data_types",
+            "category": "데이터 타입 감지",
+            "description": "데이터 타입 자동 감지",
+            "detail": "각 컬럼의 실제 데이터 특성을 분석하여 적합한 타입을 추천합니다. 날짜, 범주형, 수치형 등 의미론적 타입을 감지합니다. 데이터 전처리 방향 설정에 중요한 정보를 제공합니다."
+        },
+        {
+            "name": "get_temporal_pattern",
+            "category": "시간 패턴",
+            "description": "시간 패턴 분석",
+            "detail": "날짜/시간 컬럼에서 요일별, 월별, 시간대별 패턴을 분석합니다. 시계열 데이터의 주기성과 트렌드를 파악할 수 있습니다. 계절성이나 특정 시점의 이상 패턴을 발견하는 데 유용합니다."
+        },
+        {
+            "name": "summarize_categorical_distribution",
+            "category": "범주형 분포",
+            "description": "범주형 변수 분포 요약",
+            "detail": "범주형 컬럼의 분포를 상세하게 요약합니다. 각 카테고리의 빈도, 비율, 누적 비율을 계산합니다. 데이터의 불균형 정도나 주요 카테고리를 한눈에 파악할 수 있습니다."
+        },
+        {
+            "name": "predict_eclo",
+            "category": "ECLO 예측",
+            "description": "ECLO 단일 예측",
+            "detail": "교통사고의 ECLO(사고 심각도) 지수를 예측합니다. 사고유형, 도로형태, 기상상태 등 피처를 입력받아 예측값을 반환합니다. 사전 학습된 LightGBM 모델을 사용하여 빠른 예측이 가능합니다."
+        },
+        {
+            "name": "predict_eclo_batch",
+            "category": "ECLO 예측",
+            "description": "ECLO 일괄 예측",
+            "detail": "여러 건의 사고 데이터에 대해 ECLO를 일괄 예측합니다. 대량 데이터의 심각도를 한 번에 예측할 때 효율적입니다. 각 사고별 예측값과 함께 평균 ECLO도 제공합니다."
+        }
     ]
 }
 
@@ -164,6 +277,44 @@ AI_MODEL_OPTIONS = [
     {'id': 'claude-opus-4-5-20251101', 'name': 'Claude Opus 4.5', 'description': '복잡한 분석에 적합'},
     {'id': 'claude-haiku-4-5-20251001', 'name': 'Claude Haiku 4.5', 'description': '간단한 질문에 최적'}
 ]
+
+
+def render_response_with_table_toggle(response: str):
+    """
+    v1.2.7: AI 응답 내 마크다운 테이블을 감지하여 토글 형태로 렌더링.
+    긴 표로 인한 스크롤 문제를 해결하기 위해 표를 st.expander로 감싸서 접을 수 있게 함.
+
+    Args:
+        response: AI 응답 텍스트 (마크다운 형식)
+    """
+    # 마크다운 테이블 패턴: |로 시작하는 연속된 행들
+    # 헤더 행 | 구분자 행(---|---) | 데이터 행들
+    table_pattern = re.compile(
+        r'((?:^\|.*\|[ ]*\n)+)',
+        re.MULTILINE
+    )
+
+    parts = table_pattern.split(response)
+    table_count = 0
+
+    for part in parts:
+        if not part.strip():
+            continue
+
+        # 테이블인지 확인 (|로 시작하고 구분자 행 포함)
+        if part.strip().startswith('|') and '|' in part:
+            lines = part.strip().split('\n')
+            # 최소 2행 이상이고 구분자 행(---|---)이 있으면 테이블로 판단
+            has_separator = any(re.match(r'^\|[\s\-:|]+\|$', line.strip()) for line in lines)
+            if len(lines) >= 2 and has_separator:
+                table_count += 1
+                row_count = len(lines) - 2  # 헤더와 구분자 제외
+                with st.expander(f"📊 표 {table_count} ({row_count}행)", expanded=False):
+                    st.markdown(part)
+            else:
+                st.markdown(part)
+        else:
+            st.markdown(part)
 
 
 def init_session_state():
@@ -529,56 +680,60 @@ def render_overview_tab():
     st.markdown("---")
     st.subheader("🤖 AI 챗봇 아키텍처")
 
-    # 워크플로우 다이어그램 (텍스트 기반)
+    # v1.2.7: 워크플로우 다이어그램 정교화 - 버퍼 메모리 기반 맥락 유지 흐름 반영
     st.markdown("**LangGraph 워크플로우:**")
+    st.caption("CSV 업로드 → 질의응답 → Tool Calling → 버퍼 메모리 기반 맥락 유지")
 
-    workflow_col1, workflow_col2, workflow_col3 = st.columns([1, 2, 1])
-    with workflow_col2:
-        st.code("""
-┌─────────────────────────────────────────┐
-│              사용자 입력                 │
-└────────────────┬────────────────────────┘
-                 ▼
-┌─────────────────────────────────────────┐
-│           chatbot 노드                   │
-│      (Claude LLM 호출)                   │
-└────────────────┬────────────────────────┘
-                 ▼
-         ┌──────┴──────┐
-         │ tool_calls? │
-         └──────┬──────┘
-          Yes   │   No
-    ┌───────────┴───────────┐
-    ▼                       ▼
-┌───────────┐         ┌───────────┐
-│  tools    │         │   END     │
-│   노드    │         │  (응답)   │
-└─────┬─────┘         └───────────┘
-      │
-      └──────► chatbot (반복)
+    st.code("""
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        LangGraph 워크플로우                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌──────────┐     ┌──────────┐     ┌──────────────┐                   │
+│   │ CSV 업로드 │────▶│ DataFrame │────▶│ 데이터 컨텍스트 │                   │
+│   └──────────┘     │  파싱     │     │   생성        │                   │
+│                    └──────────┘     └───────┬──────┘                   │
+│                                             │                          │
+│                                             ▼                          │
+│   ┌─────────────────────────────────────────────────────────────────┐  │
+│   │                      대화 루프 (LangGraph)                        │  │
+│   │  ┌──────────┐     ┌──────────┐     ┌──────────────┐             │  │
+│   │  │ 사용자 질의 │────▶│ Claude AI │────▶│ Tool Calling  │             │  │
+│   │  └──────────┘     │  (LLM)    │     │ (22개 도구)   │             │  │
+│   │       ▲          └────┬─────┘     └───────┬──────┘             │  │
+│   │       │               │                   │                     │  │
+│   │       │               ▼                   ▼                     │  │
+│   │       │          ┌──────────┐     ┌──────────────┐             │  │
+│   │       │          │ AI 응답   │◀────│ 도구 실행 결과 │             │  │
+│   │       │          └────┬─────┘     └──────────────┘             │  │
+│   │       │               │                                        │  │
+│   │       │               ▼                                        │  │
+│   │       │     ┌─────────────────────┐                            │  │
+│   │       └─────│ 버퍼 메모리 (맥락 유지) │                            │  │
+│   │             │ • 이전 대화 기록 저장   │                            │  │
+│   │             │ • 다음 질의에 맥락 전달 │                            │  │
+│   │             └─────────────────────┘                            │  │
+│   └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
         """, language=None)
 
-    # 도구 목록 표시
-    st.markdown("**사용 가능한 도구 (21개):**")
+    # v1.2.7: 도구 목록을 토글 형태로 표시
+    st.markdown("**사용 가능한 도구 (22개):**")
+    st.caption("각 도구를 클릭하면 상세 설명을 확인할 수 있습니다.")
 
-    # 카테고리별로 그룹화
-    tool_categories = {}
-    for tool in CHATBOT_ARCHITECTURE['tools']:
-        category = tool['category']
-        if category not in tool_categories:
-            tool_categories[category] = []
-        tool_categories[category].append(tool)
+    # 22개 도구를 expander로 표시
+    tools = CHATBOT_ARCHITECTURE['tools']
 
-    # 카테고리별 컬럼 표시
-    category_list = list(tool_categories.keys())
-    cols = st.columns(len(category_list))
+    # 2열 레이아웃으로 표시
+    col1, col2 = st.columns(2)
 
-    for idx, category in enumerate(category_list):
-        with cols[idx]:
-            st.markdown(f"**{category}**")
-            for tool in tool_categories[category]:
-                st.markdown(f"- `{tool['name']}`")
-                st.caption(f"  {tool['description']}")
+    for idx, tool in enumerate(tools):
+        target_col = col1 if idx % 2 == 0 else col2
+        with target_col:
+            with st.expander(f"🔧 `{tool['name']}` - {tool['description']}", expanded=False):
+                st.markdown(f"**카테고리:** {tool['category']}")
+                st.markdown(tool['detail'])
 
     # v1.1.3: 시스템 구조, 데이터 분석 기초 개념, 분석 가이드 질문, 교차 데이터 분석 중요성 섹션 삭제
 
@@ -1130,7 +1285,9 @@ def render_chatbot_tab():
                         full_response += chunk
                         response_container.markdown(full_response + "▌")
 
-                response_container.markdown(full_response)
+                # v1.2.7: 스트리밍 완료 후 표 토글 렌더링
+                response_container.empty()
+                render_response_with_table_toggle(full_response)
 
                 # v1.1.3: Show tool summary after response (fixes position bug)
                 if tool_executions:
