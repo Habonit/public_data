@@ -1,0 +1,490 @@
+# GitHub Actions 워크플로우 템플릿
+#
+# 이 파일은 TDD 기반 프로젝트에서 PR 시 자동 테스트를 실행하기 위한 템플릿이다.
+# 실제 사용 시 `.github/workflows/test.yml`로 복사하고 플레이스홀더를 교체한다.
+#
+# 참고 문서: tests/principle.md (TDD 방법론 및 테스트 피라미드)
+#
+# ============================================================================
+# 테스트 피라미드 (principle.md 20장 참조)
+# ============================================================================
+#
+#                     ┌───────┐
+#                     │  E2E  │  ← 5-10% (핵심 시나리오만, main/release에서만)
+#                    ─┴───────┴─
+#                   ┌───────────┐
+#                   │   통합    │  ← 20-25% (주요 워크플로우)
+#                  ─┴───────────┴─
+#                 ┌───────────────┐
+#                 │    단위       │  ← 70% (모든 PR에서 실행)
+#                 └───────────────┘
+#
+# | 테스트 레벨 | 비율    | 실행 시점        | 목적               |
+# |------------|--------|-----------------|-------------------|
+# | 단위 테스트 | 70%    | 모든 PR          | 빠른 피드백         |
+# | 통합 테스트 | 20-25% | PR, merge        | 모듈 연결 검증      |
+# | E2E 테스트 | 5-10%  | merge, release   | 사용자 시나리오 검증 |
+#
+# ============================================================================
+# 플레이스홀더 설명
+# ============================================================================
+#
+#   {워크플로우명}       - 워크플로우 이름 (예: Test, CI)
+#   {브랜치명}           - 트리거 브랜치 (예: main, develop)
+#   {패키지 매니저}      - uv, pip, poetry 등
+#   {setup-action}       - 패키지 매니저별 setup action
+#   {python-version}     - Python 버전 (예: 3.10, 3.12)
+#   {소스디렉토리}       - 테스트 대상 소스 디렉토리 (예: src, utils)
+#   {제외마커}           - 제외할 pytest 마커 (예: api, slow)
+#   {API_KEY_시크릿명}   - GitHub Secrets에 저장된 API Key 이름
+#   {환경변수명}         - 환경변수 이름 (예: ANTHROPIC_API_KEY, OPENAI_API_KEY)
+#
+# ============================================================================
+
+name: {워크플로우명}
+
+# ============================================================================
+# 트리거 설정
+# ============================================================================
+on:
+  # PR 생성/업데이트 시 실행
+  pull_request:
+    branches: [{브랜치명}]
+    # 특정 파일 변경 시만 실행 (선택사항)
+    # paths:
+    #   - '{소스디렉토리}/**'
+    #   - 'tests/**'
+    #   - 'pyproject.toml'
+
+  # main 브랜치 push 시 실행 (선택사항)
+  # push:
+  #   branches: [{브랜치명}]
+
+  # 수동 실행 허용 (선택사항)
+  # workflow_dispatch:
+
+# ============================================================================
+# 동시 실행 제어 (선택사항)
+# ============================================================================
+# 같은 PR에서 새 커밋 push 시 이전 실행 취소
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ============================================================================
+# 환경변수 (전역)
+# ============================================================================
+env:
+  PYTHON_VERSION: "{python-version}"
+  # 필요 시 추가
+  # PYTHONUNBUFFERED: "1"
+
+# ============================================================================
+# 작업 정의
+# ============================================================================
+jobs:
+  # --------------------------------------------------------------------------
+  # 단위 테스트 (Unit Tests)
+  # --------------------------------------------------------------------------
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 패키지 매니저 설정
+      # [uv 사용 시]
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        # with:
+        #   version: "latest"
+
+      # [pip/poetry 사용 시 - Python 설정 필요]
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: ${{ env.PYTHON_VERSION }}
+      #     cache: 'pip'  # 또는 'poetry'
+      #
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
+
+      # 3. 의존성 캐싱 (선택사항 - uv는 자동 캐싱)
+      # - name: Cache dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: ~/.cache/uv
+      #     key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+
+      # 4. 단위 테스트 실행
+      - name: Run unit tests (without {제외마커})
+        run: |
+          {패키지 매니저} run pytest tests/ \
+            --ignore=tests/integration/ \
+            -m "not {제외마커}" \
+            --cov={소스디렉토리} \
+            --cov-report=term-missing \
+            -v
+
+      # 5. 커버리지 리포트 업로드 (선택사항)
+      # - name: Upload coverage report
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     fail_ci_if_error: false
+
+  # --------------------------------------------------------------------------
+  # 통합 테스트 (Integration Tests) - API 불필요
+  # --------------------------------------------------------------------------
+  integration-test:
+    name: Integration Tests (No API)
+    runs-on: ubuntu-latest
+    needs: unit-test  # 단위 테스트 통과 후 실행
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      # [pip/poetry 사용 시]
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: ${{ env.PYTHON_VERSION }}
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
+
+      - name: Run integration tests (without {제외마커})
+        run: |
+          {패키지 매니저} run pytest tests/integration/ \
+            -m "not {제외마커}" \
+            -v
+
+  # --------------------------------------------------------------------------
+  # API 테스트 (외부 API 호출 필요)
+  # --------------------------------------------------------------------------
+  api-test:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: integration-test  # 통합 테스트 통과 후 실행
+
+    # API Key가 없으면 스킵 (fork된 PR에서 secrets 접근 불가)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      # [pip/poetry 사용 시]
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: ${{ env.PYTHON_VERSION }}
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
+
+      - name: Run API tests
+        env:
+          {환경변수명}: ${{ secrets.{API_KEY_시크릿명} }}
+        run: |
+          {패키지 매니저} run pytest -m {제외마커} -v
+
+  # --------------------------------------------------------------------------
+  # E2E 테스트 (조건부 실행 - principle.md 19.2장 참조)
+  # --------------------------------------------------------------------------
+  # E2E 테스트는 비용이 높으므로 main 브랜치나 release 태그에서만 실행
+  # 모든 PR에서 실행하면 CI 시간이 크게 증가하므로 조건부 실행 권장
+  #
+  # e2e-test:
+  #   name: E2E Tests
+  #   runs-on: ubuntu-latest
+  #   needs: api-test  # API 테스트 통과 후 실행
+  #
+  #   # main 브랜치 또는 release 태그에서만 실행
+  #   if: |
+  #     github.ref == 'refs/heads/{브랜치명}' ||
+  #     startsWith(github.ref, 'refs/tags/v')
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup uv
+  #       uses: astral-sh/setup-uv@v4
+  #
+  #     # E2E 테스트용 브라우저 설치 (Playwright 사용 시)
+  #     # - name: Install Playwright browsers
+  #     #   run: {패키지 매니저} run playwright install --with-deps chromium
+  #
+  #     - name: Run E2E tests
+  #       env:
+  #         {환경변수명}: ${{ secrets.{API_KEY_시크릿명} }}
+  #       run: |
+  #         {패키지 매니저} run pytest tests/e2e/ \
+  #           -v \
+  #           --headless  # CI 환경에서는 헤드리스 모드
+  #
+  # --------------------------------------------------------------------------
+  # 린트 검사 (선택사항)
+  # --------------------------------------------------------------------------
+  # lint:
+  #   name: Lint
+  #   runs-on: ubuntu-latest
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup uv
+  #       uses: astral-sh/setup-uv@v4
+  #
+  #     - name: Run ruff
+  #       run: {패키지 매니저} run ruff check .
+  #
+  #     - name: Run ruff format check
+  #       run: {패키지 매니저} run ruff format --check .
+
+  # --------------------------------------------------------------------------
+  # 타입 검사 (선택사항)
+  # --------------------------------------------------------------------------
+  # type-check:
+  #   name: Type Check
+  #   runs-on: ubuntu-latest
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup uv
+  #       uses: astral-sh/setup-uv@v4
+  #
+  #     - name: Run mypy
+  #       run: {패키지 매니저} run mypy {소스디렉토리}
+
+# ============================================================================
+# 사용 예시
+# ============================================================================
+#
+# 1. 본 프로젝트 (대구 공공데이터)
+#    - 워크플로우명: Test
+#    - 브랜치명: main
+#    - 패키지 매니저: uv
+#    - python-version: 3.12
+#    - 소스디렉토리: utils
+#    - 제외마커: api
+#    - 환경변수명: ANTHROPIC_API_KEY
+#    - API_KEY_시크릿명: ANTHROPIC_API_KEY
+#
+# 2. FastAPI 백엔드 프로젝트
+#    - 워크플로우명: CI
+#    - 브랜치명: main, develop
+#    - 패키지 매니저: poetry run
+#    - python-version: 3.11
+#    - 소스디렉토리: src
+#    - 제외마커: slow
+#    - 환경변수명: DATABASE_URL
+#    - API_KEY_시크릿명: DATABASE_URL
+#
+# ============================================================================
+# Runner 선택 가이드: GitHub-hosted vs Self-hosted
+# ============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                        Runner 선택 플로우차트                            │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │   Q1. Public 리포지토리인가?                                             │
+# │        │                                                                │
+# │        ├─► YES ─► GitHub-hosted 권장 (무료, 관리 불필요)                  │
+# │        │                                                                │
+# │        └─► NO (Private) ─► Q2로                                         │
+# │                                                                         │
+# │   Q2. 월 2,000분 무료 한도 내에서 사용 가능한가?                           │
+# │        │                                                                │
+# │        ├─► YES ─► GitHub-hosted 권장                                    │
+# │        │                                                                │
+# │        └─► NO ─► Self-hosted 고려 (비용 절감)                            │
+# │                                                                         │
+# │   Q3. 특수 요구사항이 있는가?                                             │
+# │        │                                                                │
+# │        ├─► GPU 필요 ─► Self-hosted 필수                                  │
+# │        ├─► 내부망 접근 필요 ─► Self-hosted 필수                           │
+# │        ├─► 고성능 CPU/RAM 필요 ─► Self-hosted 또는 larger runner          │
+# │        │                                                                │
+# │        └─► 없음 ─► GitHub-hosted 권장                                   │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ----------------------------------------------------------------------------
+# GitHub-hosted Runner 사용 (기본값)
+# ----------------------------------------------------------------------------
+#
+# 설정:
+#   runs-on: ubuntu-latest    # Linux
+#   runs-on: windows-latest   # Windows
+#   runs-on: macos-latest     # macOS
+#
+# 장점:
+#   - 설정/관리 불필요 (GitHub이 모든 것을 관리)
+#   - 매번 깨끗한 VM 환경 (환경 오염 없음)
+#   - Public repo는 완전 무료
+#   - 보안 업데이트 자동 적용
+#
+# 단점:
+#   - Private repo는 월 2,000분 무료 제한 (초과 시 과금)
+#   - 매번 새 VM이므로 의존성 설치 시간 소요 (캐시로 완화 가능)
+#   - 특수 하드웨어(GPU) 사용 불가
+#   - 내부망 리소스 접근 불가
+#
+# 적합한 경우:
+#   ✓ 오픈소스 프로젝트 (Public repo)
+#   ✓ 일반적인 pytest, lint, build 작업
+#   ✓ 외부 API 호출만 필요한 경우 (Anthropic, OpenAI 등)
+#   ✓ 빠른 테스트 (수 분 이내)
+#   ✓ 서버 관리 리소스가 없는 소규모 팀
+#
+# 비용 (Private repo 기준):
+#   - 무료: 월 2,000분
+#   - Linux: $0.008/분
+#   - Windows: $0.016/분
+#   - macOS: $0.08/분
+#
+# ----------------------------------------------------------------------------
+# Self-hosted Runner 사용
+# ----------------------------------------------------------------------------
+#
+# 설정:
+#   runs-on: self-hosted                    # 기본
+#   runs-on: [self-hosted, linux, x64]      # 레이블 지정
+#   runs-on: [self-hosted, gpu]             # 커스텀 레이블
+#
+# 장점:
+#   - 실행 시간 무제한 (자체 서버이므로 과금 없음)
+#   - 특수 하드웨어 사용 가능 (GPU, 고성능 CPU)
+#   - 내부망 리소스 접근 가능 (사내 DB, 내부 API)
+#   - 환경 캐싱 유지 (의존성 재설치 불필요)
+#   - 완전한 환경 제어
+#
+# 단점:
+#   - 직접 서버 관리 필요 (설치, 업데이트, 보안)
+#   - 인프라 비용 발생 (서버, 네트워크)
+#   - 환경 오염 가능성 (이전 작업 잔재)
+#   - 보안 위험 (신뢰할 수 없는 코드 실행 주의)
+#
+# 적합한 경우:
+#   ✓ Private repo에서 CI 사용량이 많은 경우
+#   ✓ GPU가 필요한 ML/AI 프로젝트
+#   ✓ 내부망 DB나 서비스에 접근해야 하는 경우
+#   ✓ 빌드/테스트 시간이 매우 긴 경우 (캐시 이점)
+#   ✓ 특정 OS 버전이나 설정이 필요한 경우
+#   ✓ 규제 준수로 외부 서버 사용 불가한 경우
+#
+# Self-hosted 설정 방법:
+#   1. GitHub repo → Settings → Actions → Runners
+#   2. "New self-hosted runner" 클릭
+#   3. OS 선택 후 안내에 따라 서버에 runner 설치
+#   4. ./run.sh 실행 (또는 서비스로 등록)
+#
+# 보안 주의사항:
+#   - Public repo에서 self-hosted 사용 시 악의적 PR 주의
+#   - 격리된 환경 (Docker, VM) 사용 권장
+#   - 정기적인 보안 업데이트 필수
+#
+# ----------------------------------------------------------------------------
+# 비교 요약
+# ----------------------------------------------------------------------------
+#
+# | 항목          | GitHub-hosted          | Self-hosted              |
+# |--------------|------------------------|--------------------------|
+# | 설정 난이도   | 없음 (즉시 사용)         | 중간 (서버 설정 필요)      |
+# | 관리 부담     | 없음                    | 있음 (서버 관리)          |
+# | 비용 (Public) | 무료                    | 서버 비용                 |
+# | 비용 (Private)| 2,000분 무료 + 초과 과금  | 서버 비용만               |
+# | 실행 환경     | 매번 새 VM              | 지속되는 환경             |
+# | 특수 하드웨어 | 불가                    | 가능 (GPU 등)            |
+# | 내부망 접근   | 불가                    | 가능                     |
+# | 보안          | GitHub 관리             | 직접 관리                 |
+#
+# ----------------------------------------------------------------------------
+# 추천 시나리오
+# ----------------------------------------------------------------------------
+#
+# 시나리오 1: 오픈소스 프로젝트
+#   → GitHub-hosted (ubuntu-latest)
+#   → 무료, 관리 불필요
+#
+# 시나리오 2: 스타트업 Private repo (소규모)
+#   → GitHub-hosted
+#   → 월 2,000분이면 대부분 충분
+#
+# 시나리오 3: 기업 Private repo (대규모 CI)
+#   → Self-hosted
+#   → 비용 절감, 캐시 이점
+#
+# 시나리오 4: ML/AI 프로젝트 (GPU 필요)
+#   → Self-hosted (GPU 서버)
+#   → GitHub-hosted는 GPU 미지원
+#
+# 시나리오 5: 금융/의료 (규제 환경)
+#   → Self-hosted (내부망)
+#   → 데이터가 외부로 나가면 안 되는 경우
+#
+# ============================================================================
+# 패키지 매니저별 setup action
+# ============================================================================
+#
+# | 패키지 매니저 | setup action              | 실행 명령어      |
+# |--------------|---------------------------|-----------------|
+# | uv           | astral-sh/setup-uv@v4     | uv run pytest   |
+# | pip          | actions/setup-python@v5   | pytest          |
+# | poetry       | actions/setup-python@v5   | poetry run pytest |
+# | pdm          | pdm-project/setup-pdm@v4  | pdm run pytest  |
+# | pipenv       | actions/setup-python@v5   | pipenv run pytest |
+#
+# ============================================================================
+# GitHub Secrets 설정 방법
+# ============================================================================
+#
+# 1. GitHub 리포지토리 → Settings → Secrets and variables → Actions
+# 2. "New repository secret" 클릭
+# 3. Name: {API_KEY_시크릿명} (예: ANTHROPIC_API_KEY)
+# 4. Secret: 실제 API Key 값 입력
+# 5. "Add secret" 클릭
+#
+# 주의: Fork된 PR에서는 secrets에 접근 불가
+#       → `if: github.event.pull_request.head.repo.full_name == github.repository`
+#       조건으로 스킵 처리
+#
+# ============================================================================
+# 트러블슈팅
+# ============================================================================
+#
+# Q: 테스트가 계속 실패하는데 로컬에서는 통과함
+# A: 환경 차이 확인
+#    - Python 버전 일치 여부
+#    - 의존성 버전 (pyproject.toml vs CI 환경)
+#    - 환경변수 설정 여부
+#
+# Q: API 테스트가 스킵됨
+# A: Fork된 PR이거나 secrets 미설정
+#    - secrets 설정 확인
+#    - 본인 리포지토리에서 PR 생성
+#
+# Q: 캐시가 안 되는 것 같음
+# A: uv는 자동 캐싱, pip/poetry는 명시적 캐시 설정 필요
+#    - actions/cache@v4 사용
+#    - cache key에 lock 파일 해시 포함
+#
+# Q: 동시 실행으로 리소스 낭비
+# A: concurrency 설정으로 이전 실행 취소
+#    - cancel-in-progress: true
+#
+# ============================================================================
