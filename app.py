@@ -42,6 +42,7 @@ from utils.chatbot import (
 from anthropic import Anthropic
 
 # v1.2: 버전 히스토리 상수
+# v1.3.1: v1.2 최신화, v1.3 추가
 VERSION_HISTORY = [
     {
         "version": "v1.0",
@@ -74,9 +75,22 @@ VERSION_HISTORY = [
         "description": "LangGraph 기반 Tool Calling 아키텍처로 전환",
         "features": [
             "LangGraph StateGraph 기반 워크플로우",
-            "ECLO 예측 도구 추가 (21번째 도구)",
+            "ECLO 예측 도구 추가 (22개 도구)",
             "향상된 도구 실행 및 라우팅",
-            "uv 패키지 매니저 지원"
+            "uv 패키지 매니저 지원",
+            "AI 응답 표 토글 렌더링"
+        ]
+    },
+    {
+        "version": "v1.3",
+        "date": "2025-12",
+        "title": "배포 준비 및 전처리",
+        "description": "Streamlit Community Cloud 배포 준비 및 사고일시 전처리 기능 추가",
+        "features": [
+            "사고일시 자동 전처리 (연/월/일/시/시간대)",
+            "의존성 동기화 (scikit-learn, lightgbm)",
+            "프로젝트 개요 탭 콘텐츠 보강",
+            "TDD 기반 테스트 코드 추가"
         ]
     }
 ]
@@ -570,8 +584,9 @@ def render_overview_tab():
     """
     Render the project overview tab with upload functionality. (T016-T019)
     v1.3: 교육용 앱 설명, DACON 대회 링크, 데이터 업로드 안내 추가 (FR-004, FR-005, FR-006)
+    v1.3.1: 헤더 삭제, 7개 데이터셋 명시, 데이터 준비 방법 수정
     """
-    st.header("📖 프로젝트 개요")
+    # v1.3.1: 📖 프로젝트 개요 헤더 삭제 (탭 이름으로 충분)
 
     # v1.3: FR-004 - 교육용 앱 설명 (st.info)
     st.info("""
@@ -582,36 +597,40 @@ def render_overview_tab():
     데이터 탐색, 시각화, AI 기반 분석을 실습할 수 있습니다.
     """)
 
-    # v1.3: FR-005 - DACON 대회 링크 (st.markdown)
+    # v1.3.1: 7개 데이터셋 명시
     st.markdown("""
     ### 📊 데이터 출처
 
-    이 앱에서 사용하는 **훈련 데이터(train.csv)** 및 **테스트 데이터(test.csv)**는
-    DACON 대구 교통사고 피해 예측 AI 경진대회에서 제공됩니다.
+    이 앱에서 사용하는 **총 7개 데이터셋**은 DACON 대구 교통사고 피해 예측 AI 경진대회에서 제공됩니다:
+    - **CCTV 정보** (`대구 CCTV 정보.csv`)
+    - **보안등 정보** (`대구 보안등 정보.csv`)
+    - **어린이 보호구역 정보** (`대구 어린이 보호 구역 정보.csv`)
+    - **주차장 정보** (`대구 주차장 정보.csv`)
+    - **사고 데이터** (`countrywide_accident.csv`)
+    - **훈련 데이터** (`train.csv`)
+    - **테스트 데이터** (`test.csv`)
 
     👉 **[DACON 대회 페이지 바로가기](https://dacon.io/competitions/official/236193/overview/description)**
     """)
 
-    # v1.3: FR-006 - 데이터 다운로드/업로드 안내
+    # v1.3.1: 데이터 준비 방법 수정
     st.markdown("""
     ### 📥 데이터 준비 방법
 
     1. 위 DACON 대회 링크에 접속합니다
-    2. 대회 참가 후 **데이터** 탭에서 `train.csv`, `test.csv`를 다운로드합니다
+    2. 대회 참가 후 **데이터** 탭에서 데이터를 다운로드합니다
     3. 아래 **데이터 업로드** 섹션에서 파일을 업로드합니다
-    4. **훈련 데이터**, **테스트 데이터** 탭에서 데이터를 탐색합니다
+    4. 업로드한 데이터에 대하여 EDA를 진행합니다
     5. **데이터 질의응답** 탭에서 AI 챗봇에 ECLO 예측을 요청할 수 있습니다
     """)
 
     st.markdown("---")
 
-    # Project Introduction
+    # v1.3.1: 프로젝트 소개 간소화
     st.markdown("""
     ## 대구 공공데이터 시각화 프로젝트
 
-    이 프로젝트는 대구시의 다양한 공공 데이터를 탐색하고 분석할 수 있는 대화형 웹 애플리케이션입니다.
-    데이터 분석을 학습하는 사용자들이 실제 공공 데이터를 통해 인사이트를 발견하고
-    데이터 시각화 기술을 익힐 수 있도록 설계되었습니다.
+    대구시의 다양한 공공 데이터를 탐색하고 분석할 수 있는 대화형 웹 애플리케이션입니다.
     """)
 
     # Data Upload Section (T017-T019)
@@ -668,6 +687,7 @@ def render_overview_tab():
     st.markdown("---")
 
     # Technical Information (T045) - v1.1.3: 주요 기능, 사용 방법 섹션 삭제
+    # v1.3.1: requirements.txt 기준 최신화
     st.subheader("🔧 기술 스택")
 
     tech_col1, tech_col2, tech_col3 = st.columns(3)
@@ -678,6 +698,7 @@ def render_overview_tab():
         - Streamlit 1.28+
         - Plotly 5.17+
         - Folium 0.14+
+        - Matplotlib 3.8+
         """)
 
     with tech_col2:
@@ -685,13 +706,16 @@ def render_overview_tab():
         **데이터 처리**
         - Pandas 2.0+
         - NumPy 1.24+
+        - scikit-learn 1.7+
+        - LightGBM 4.6+
         """)
 
     with tech_col3:
         st.markdown("""
-        **AI**
+        **AI/LLM**
         - Anthropic Claude
-        - LangChain/LangGraph
+        - LangChain 0.3+
+        - LangGraph 0.2+
         - Python 3.10+
         """)
 
@@ -702,7 +726,7 @@ def render_overview_tab():
     for version_info in VERSION_HISTORY:
         with st.expander(
             f"**{version_info['version']}** - {version_info['title']} ({version_info['date']})",
-            expanded=(version_info['version'] == 'v1.2')  # 최신 버전만 펼침
+            expanded=(version_info['version'] == 'v1.3')  # 최신 버전만 펼침
         ):
             st.markdown(f"_{version_info['description']}_")
             st.markdown("**주요 기능:**")
@@ -1116,7 +1140,8 @@ def render_sidebar():
             st.caption("기본값: 5000")
 
             # 숨김 submit 버튼 (Enter 키로 제출)
-            submitted = st.form_submit_button("적용", use_container_width=True)
+            # v1.3.1: use_container_width deprecated → width 사용
+            submitted = st.form_submit_button("적용")
 
             if submitted:
                 try:
@@ -1235,7 +1260,8 @@ def render_chatbot_tab():
             missing_pct = (df.isnull().sum().sum() / total_cells * 100) if total_cells > 0 else 0
             st.metric("전체 결측률", f"{missing_pct:.1f}%")
         # v1.2.4: 샘플 데이터 10개로 변경
-        st.dataframe(df.head(10), use_container_width=True)
+        # v1.3.1: use_container_width deprecated → width 사용
+        st.dataframe(df.head(10), width='stretch')
 
     st.markdown("---")
 
@@ -1245,9 +1271,36 @@ def render_chatbot_tab():
     # T049: Display conversation history
     st.subheader("대화 내역")
 
-    for msg in chat_history:
+    # v1.3.1: 모든 AI 응답에 복사 버튼 추가
+    for idx, msg in enumerate(chat_history):
         with st.chat_message(msg['role']):
             st.markdown(msg['content'])
+            # AI 응답에만 복사 버튼 추가
+            if msg['role'] == 'assistant':
+                import html
+                escaped_content = html.escape(msg['content']).replace('\n', '\\n').replace("'", "\\'")
+                copy_js = f"""
+                <script>
+                function copyToClipboard_history_{idx}() {{
+                    const text = '{escaped_content}'.replace(/\\\\n/g, '\\n');
+                    navigator.clipboard.writeText(text).then(function() {{
+                        document.getElementById('copy-btn-history-{idx}').innerText = '✅ 복사됨!';
+                        setTimeout(function() {{
+                            document.getElementById('copy-btn-history-{idx}').innerText = '📋 복사';
+                        }}, 2000);
+                    }});
+                }}
+                </script>
+                <button id="copy-btn-history-{idx}" onclick="copyToClipboard_history_{idx}()" style="
+                    background-color: #f0f2f6;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    padding: 4px 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">📋 복사</button>
+                """
+                st.components.v1.html(copy_js, height=40)
 
     # T047, T048: Question input and send
     user_question = st.chat_input("데이터에 대해 질문하세요...")
@@ -1389,10 +1442,7 @@ def main():
     render_sidebar()
 
     st.title("📊 대구 공공데이터 시각화")
-    st.markdown("""
-    대구 공공데이터 시각화 도구에 오신 것을 환영합니다! 이 애플리케이션은
-    7개의 공공 데이터셋을 탐색하고 대화형 시각화를 통해 공간 패턴을 발견할 수 있도록 도와줍니다.
-    """)
+    # v1.3.1: 환영 문구 삭제
 
     # Create tabs - T013: 프로젝트 개요 first, T014: tab names, T015: 데이터 질의응답 추가
     # v1.1.3: 교차 데이터 분석 탭 삭제 (10개 → 9개)

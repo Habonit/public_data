@@ -36,7 +36,90 @@ streamlit run app.py
 
 ## 버전 히스토리
 
-### v1.2.7 (현재)
+### v1.3.1 (현재)
+
+**UI 문구 수정 및 코드 품질 개선** - 환영 문구 삭제, 복사 기능 개선, Deprecation Warning 수정
+
+#### 주요 변경사항
+
+| 영역 | v1.3 | v1.3.1 |
+|:-----|:-----|:-------|
+| **메인 타이틀** | 환영 문구 표시 | 환영 문구 삭제 |
+| **프로젝트 개요** | `📖 프로젝트 개요` 헤더 | 헤더 삭제 (탭 이름으로 충분) |
+| **데이터 출처** | train.csv, test.csv 2개 언급 | 총 7개 데이터셋 명시 |
+| **AI 응답 복사** | 가장 최근 응답만 복사 가능 | 모든 AI 응답에 복사 버튼 |
+| **Streamlit API** | `use_container_width` (deprecated) | `width='stretch'`/`width='content'` |
+
+#### 버그/경고 수정 (P0)
+
+- **Deprecation Warning 수정** (`app.py`)
+  - `use_container_width=True` → `width='stretch'`
+  - `use_container_width=False` → `width='content'`
+  - 2025-12-31 제거 예정 파라미터 사전 대응
+
+#### 기능 개선 (P1)
+
+- **복사 기능 개선** (`app.py`)
+  - 모든 AI 응답에 복사 버튼 추가 (과거 응답 포함)
+  - 마크다운 형태로 클립보드 복사
+
+- **프로젝트 개요 문구 수정** (`app.py`)
+  - `📖 프로젝트 개요` 헤더 삭제
+  - 데이터 출처: 7개 데이터셋 명시 (CCTV, 보안등, 어린이보호구역, 주차장, 사고, 훈련, 테스트)
+  - 데이터 준비 방법: EDA 강조, 데이터 다운로드 일반화
+
+- **메인 타이틀 환영 문구 삭제** (`app.py`)
+
+#### 문서/정보 업데이트 (P2)
+
+- **기술 스택 최신화** (`app.py`)
+  - requirements.txt 기준 버전 업데이트
+  - scikit-learn 1.7+, LightGBM 4.6+ 명시
+
+- **버전 히스토리 v1.3 추가** (`app.py`)
+
+기준 문서: `docs/v1.3.1/app_improvement_proposal.md`
+
+---
+
+### v1.3
+
+**사고일시 전처리 및 ECLO 예측 개선** - 사고일시 파싱, 시간대 분류, 의존성 동기화
+
+#### 주요 변경사항
+
+| 영역 | v1.2.7 | v1.3 |
+|:-----|:-------|:-----|
+| **사고일시 전처리** | 미지원 | 연/월/일/시간/분 파싱 + 시간대 분류 |
+| **시간대 분류** | 수동 입력 필요 | 자동 분류 (새벽/아침/낮/저녁/밤) |
+| **ML 패키지** | 미포함 | scikit-learn 1.7.2+, LightGBM 4.6.0+ |
+| **테스트 코드** | 미존재 | pytest 기반 23개 테스트 |
+
+#### 신규 기능
+
+- **사고일시 전처리** (`utils/preprocessing.py`)
+  - `preprocess_accident_datetime()`: 사고일시 컬럼에서 연/월/일/시간/분 추출
+  - `hour_to_period()`: 시간을 5개 시간대로 분류 (새벽/아침/낮/저녁/밤)
+
+#### 신규 파일
+
+| 파일 | 설명 |
+|:-----|:-----|
+| `utils/preprocessing.py` | 사고일시 전처리 모듈 |
+| `tests/test_preprocessing.py` | 전처리 함수 테스트 (23개 케이스) |
+| `tests/conftest.py` | pytest 설정 |
+
+#### 의존성 추가
+
+- `scikit-learn>=1.7.2` (ML 유틸리티)
+- `lightgbm>=4.6.0` (ECLO 예측 모델)
+
+기준 문서: `docs/v1.3/app_improvement_proposal.md`
+스펙 문서: `specs/005-v1-3-deploy-prep/`
+
+---
+
+### v1.2.7
 
 **프로젝트 개요 탭 개선 및 UX 향상** - 긴 표 토글, 22개 도구 목록 토글화, 워크플로우 다이어그램 정교화
 
@@ -553,6 +636,7 @@ public_data/
 │   ├── chatbot.py        # AI 챗봇 로직 (LangGraph 통합)
 │   ├── graph.py          # v1.2: LangGraph StateGraph 정의
 │   ├── predictor.py      # v1.2: ECLO 예측 모듈
+│   ├── preprocessing.py  # v1.3: 사고일시 전처리 모듈
 │   ├── prompts.py        # v1.2.3: 시스템 프롬프트 모듈
 │   ├── tools.py          # Tool Calling 도구 (22개)
 │   ├── visualizer.py     # Plotly 시각화
@@ -561,12 +645,16 @@ public_data/
 │   └── narration.py      # 나레이션
 ├── docs/                  # 버전별 문서
 │   ├── constitution.md
-│   ├── v1.0/, v1.1/, v1.1.1/, v1.1.2/, v1.1.3/, v1.2/, v1.2.1/, v1.2.2/, v1.2.3/, v1.2.4/, v1.2.5/
+│   ├── v1.0/, v1.1/, v1.1.1/, v1.1.2/, v1.1.3/, v1.2/, v1.2.1/, v1.2.2/, v1.2.3/, v1.2.4/, v1.2.5/, v1.2.6/, v1.2.7/, v1.3/, v1.3.1/
 ├── specs/                 # SDD 스펙 산출물
 │   ├── 001-daegu-data-viz/
 │   ├── 002-app-v1-1-upgrade/
 │   ├── 003-app-v111-upgrade/
-│   └── 004-app-v12-upgrade/
+│   ├── 004-app-v12-upgrade/
+│   └── 005-v1-3-deploy-prep/
+├── tests/                 # v1.3: 테스트 코드
+│   ├── conftest.py        # pytest 설정
+│   └── test_preprocessing.py  # 전처리 함수 테스트 (23개)
 └── material/              # 일차별 학습 자료
     ├── 01-03/            # 1~3일차
     ├── 03-07/            # 3~7일차
@@ -595,10 +683,15 @@ public_data/
 | `docs/v1.2.3/*.md` | v1.2.3 개선 제안서 (프롬프트 모듈화, 배치 예측) |
 | `docs/v1.2.4/*.md` | v1.2.4 개선 제안서 (버그 수정, UX 개선) |
 | `docs/v1.2.5/*.md` | v1.2.5 개선 제안서 (헤더 버그 재수정, AI 보고서, material 표준화) |
+| `docs/v1.2.6/*.md` | v1.2.6 개선 제안서 (Tool Calling 버그 수정, AI 응답 복사) |
+| `docs/v1.2.7/*.md` | v1.2.7 개선 제안서 (UX 향상, 도구 토글화, 워크플로우 정교화) |
+| `docs/v1.3/*.md` | v1.3 개선 제안서 (사고일시 전처리, 의존성 동기화) |
+| `docs/v1.3.1/*.md` | v1.3.1 개선 제안서 (UI 문구 수정, Deprecation 수정) |
 | `specs/001-daegu-data-viz/` | v1.0 스펙 산출물 (spec, plan, tasks) |
 | `specs/002-app-v1-1-upgrade/` | v1.1 스펙 산출물 |
 | `specs/003-app-v111-upgrade/` | v1.1.1 스펙 산출물 |
 | `specs/004-app-v12-upgrade/` | v1.2 스펙 산출물 (LangGraph, ECLO 예측) |
+| `specs/005-v1-3-deploy-prep/` | v1.3 스펙 산출물 (Streamlit 배포 준비) |
 | `material/` | 일차별 학습 자료 (아래 참조) |
 | `syllabus.md` | 전체 15일 커리큘럼 문서 |
 
