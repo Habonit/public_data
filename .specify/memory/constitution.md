@@ -1,23 +1,29 @@
 <!--
 Sync Impact Report:
 ===================
-Version: 1.1.0 → 1.2.0 (MINOR - 새 의존성 추가 및 데이터 로딩 방식 변경 반영)
+Version: 1.2.0 → 1.3.0 (MINOR - TDD, Error Handling, AI/ML, 배포 환경 변경 등 다수 섹션 추가)
 Ratification Date: 2025-11-21
-Last Amended: 2025-12-02
+Last Amended: 2025-12-11
 
 Modified Principles:
 - UNCHANGED: I. Data-First Exploration
 - UNCHANGED: II. Simplicity & Accessibility
 - UNCHANGED: III. Educational Purpose (NON-NEGOTIABLE)
-- UNCHANGED: IV. Streamlit-Based Visualization
+- MODIFIED: IV. Streamlit-Based Visualization (로컬 실행 → Streamlit Community Cloud 배포)
 - UNCHANGED: V. Scope Discipline
 
 Added Sections:
-- None
+- VIII. 3.4 전처리 파이프라인 (Data Handling Rules 하위)
+- XI. 브랜치 전략 (Branch Strategy)
+- XII. TDD (Test-Driven Development) 방법론
+- XIII. Error Handling
+- XIV. Environment & Configuration
+- XV. Code Review Checklist
+- XVI. AI/ML Guidelines
 
 Modified Sections:
-- VIII. Data Handling Rules: 데이터 로딩 방식 (고정 파일 → CSV 업로드) 반영
-- IX. Dependencies: anthropic 패키지 추가 (AI 챗봇 기능)
+- VIII. Data Handling Rules: CSV 인코딩 순서 변경 (3개 → 4개)
+- IX. Dependencies: 필수 패키지 확장 (7개 → 14개), 선택적 패키지 축소
 
 Removed Sections:
 - None
@@ -31,9 +37,11 @@ Follow-up TODOs:
 - None (all placeholders filled)
 
 Change Summary (한국어):
-- v1.1 앱 개선사항 반영: CSV 업로드 방식, AI 챗봇 기능
-- anthropic 패키지를 필수 의존성으로 추가
-- 데이터 로딩 방식을 업로드 기반으로 문서 업데이트
+- v1.3 배포 준비: Streamlit Community Cloud 배포 환경 반영
+- TDD 방법론, Error Handling, AI/ML Guidelines 등 개발 규칙 대폭 강화
+- 의존성 패키지 14개로 확장 (langchain, scikit-learn, lightgbm 등)
+- CSV 인코딩 순서 4개로 확장 (utf-8-sig 우선)
+- 전처리 파이프라인, 브랜치 전략, 환경 설정, 코드 리뷰 체크리스트 추가
 -->
 
 # 대구 공공데이터 시각화 프로젝트 Constitution
@@ -79,9 +87,9 @@ Change Summary (한국어):
 - Plotly 또는 유사 라이브러리를 사용한 대화형 그래프
 - Folium, Pydeck 또는 동등한 도구를 사용한 지도 기반 시각화
 - 다양한 화면 크기(모바일, 태블릿, 데스크톱)에 적응하는 반응형 UI
-- 로컬 실행만 지원 (배포 불필요)
+- **배포 환경**: Streamlit Community Cloud 기준
 
-**근거**: Streamlit은 빠른 프로토타이핑을 가능하게 하고 학습자가 대화형 데이터 애플리케이션을 구축하는 데 낮은 진입 장벽을 제공한다. 로컬 실행 집중은 복잡성을 줄인다.
+**근거**: Streamlit은 빠른 프로토타이핑을 가능하게 하고 학습자가 대화형 데이터 애플리케이션을 구축하는 데 낮은 진입 장벽을 제공한다.
 
 ### V. Scope Discipline (범위 규율)
 
@@ -95,12 +103,12 @@ Change Summary (한국어):
 - 데이터셋 간 관계 탐색
 - 경량 탐색적 분석 기능
 - AI 기반 데이터 질의응답 (챗봇)
+- ECLO 예측 모델 추론 (LightGBM)
 
 **제외 범위**:
 - 별도 백엔드 API 개발
 - 데이터베이스 구축
-- 머신러닝/딥러닝 모델 학습
-- 대시보드 배포 (프로덕션 호스팅)
+- 머신러닝/딥러닝 모델 학습 (추론만 허용)
 - 고급 GIS 작업 (복잡한 공간 처리)
 
 **근거**: 명확한 경계는 범위 확장을 방지하고 교육 미션에 집중을 유지한다. 제외된 기능을 추가하면 교육적 가치에 상응하지 않는 복잡성과 유지보수 부담이 증가한다.
@@ -201,7 +209,7 @@ def function_name(param1: str, param2: int) -> dict:
 
 ### 8.1 CSV 인코딩
 
-인코딩 시도 순서: `UTF-8` → `UTF-8-SIG` → `CP949`
+인코딩 시도 순서: `UTF-8-SIG` → `UTF-8` → `CP949` → `EUC-KR`
 
 한글 파일명 지원 필수(MUST)
 
@@ -227,9 +235,16 @@ def function_name(param1: str, param2: int) -> dict:
 | 항목 | 제한 | 초과 시 처리 |
 |------|------|-------------|
 | 지도 시각화 최대 포인트 | 5,000개 | 샘플링 |
+| 근접성 분석 최대 행 | 5,000행 | 샘플링 |
 | 범주형 컬럼 상위 표시 | 20개 | 상위 N개만 표시 |
 
-### 8.5 지원 데이터셋
+### 8.5 전처리 파이프라인
+
+- 전처리 함수는 `utils/preprocessing.py`에 모듈화
+- 원본 데이터 변경 금지 (복사본 사용)
+- 전처리 결과는 session_state에 캐싱
+
+### 8.6 지원 데이터셋
 
 다음 형식의 CSV 파일 업로드를 지원한다:
 
@@ -255,7 +270,14 @@ def function_name(param1: str, param2: int) -> dict:
 | plotly | 5.17.0 | 대화형 차트 |
 | folium | 0.14.0 | 지도 시각화 |
 | streamlit-folium | 0.15.0 | Folium-Streamlit 통합 |
-| anthropic | 0.39.0 | AI 챗봇 (Claude API) |
+| matplotlib | 3.8.0 | 추가 시각화 |
+| openpyxl | 3.1.5 | Excel 파일 지원 |
+| anthropic | 0.39.0 | AI 챗봇 API |
+| langchain | 0.3.0 | LLM 프레임워크 |
+| langchain-anthropic | 0.3.0 | Anthropic 연동 |
+| langgraph | 0.2.0 | Tool Calling 워크플로우 |
+| scikit-learn | 1.7.2 | ML 유틸리티 |
+| lightgbm | 4.6.0 | ECLO 예측 모델 |
 
 ### 선택적 패키지
 
@@ -264,8 +286,6 @@ def function_name(param1: str, param2: int) -> dict:
 | geopandas | 지도 렌더링 (선택) |
 | pydeck | 지도 시각화 대안 (선택) |
 | leafmap | 지도 시각화 대안 (선택) |
-| matplotlib | 추가 시각화 (선택) |
-| openpyxl | Excel 파일 지원 (선택) |
 
 ---
 
@@ -316,6 +336,180 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 
 ---
 
+## XI. Branch Strategy (브랜치 전략)
+
+### 11.1 브랜치 네이밍
+
+- spec 문서를 만들 때의 이름으로 브랜치를 쓰지 않는다
+- 무조건 버전 이름으로만 브랜치를 딴다
+- 형태: `version/{실제 버전}` (예: `version/1.3`)
+
+### 11.2 버전 번호 규칙
+
+- **Major (x.0.0)**: 대규모 기능 추가 또는 Breaking Change
+- **Minor (1.x.0)**: 신규 기능 추가
+- **Patch (1.2.x)**: 버그 수정 및 소규모 개선
+
+### 11.3 릴리스 절차
+
+1. `app_improvement_proposal.md` 작성
+2. 테스트 코드 작성 (TDD)
+3. 구현 및 테스트 통과 확인
+4. README.md 버전 히스토리 업데이트
+
+---
+
+## XII. TDD (Test-Driven Development) 방법론
+
+### 12.1 개발 프로세스
+
+1. **제안서 작성**: `docs/v{버전}/app_improvement_proposal.md` 작성
+2. **테스트 코드 작성**: 구현 전에 테스트 코드를 먼저 작성
+3. **구현**: 테스트를 통과하도록 기능 구현
+4. **검증**: 모든 테스트 통과 확인
+
+### 12.2 테스트 코드 규칙
+
+- **테스트 위치**: `tests/` 디렉토리
+- **테스트 파일명**: `test_<모듈명>.py`
+- **테스트 함수명**: `test_<기능명>_<상황>` (예: `test_preprocess_datetime_valid_input`)
+- **테스트 프레임워크**: pytest
+
+### 12.3 테스트 작성 순서
+
+```python
+# 1. 정상 케이스 (Happy Path)
+def test_preprocess_datetime_valid_input():
+    ...
+
+# 2. 경계 케이스 (Edge Case)
+def test_preprocess_datetime_midnight():
+    ...
+
+# 3. 예외 케이스 (Error Case)
+def test_preprocess_datetime_missing_column():
+    ...
+```
+
+### 12.4 테스트 실행
+
+```bash
+# 전체 테스트 실행
+pytest tests/
+
+# 특정 테스트 파일 실행
+pytest tests/test_preprocessing.py
+
+# 커버리지 포함 실행
+pytest tests/ --cov=utils
+```
+
+### 12.5 TDD 적용 대상
+
+- `app_improvement_proposal.md`에 정의된 모든 신규 기능
+- 전처리 함수 및 유틸리티 함수
+- ML 모델 추론 관련 함수
+
+---
+
+## XIII. Error Handling
+
+### 13.1 예외 처리 원칙
+
+- 사용자에게 친절한 한글 에러 메시지 제공
+- 내부 에러 로깅과 사용자 메시지 분리
+- 복구 가능한 에러는 Graceful Degradation 적용
+
+### 13.2 Graceful Degradation (우아한 성능 저하)
+
+시스템의 일부 기능이 실패하더라도 전체 시스템이 중단되지 않고,
+가능한 범위 내에서 서비스를 계속 제공하는 설계 원칙.
+
+**예시:**
+- ML 모델 로딩 실패 → ECLO 예측 기능만 비활성화, 나머지 앱은 정상 동작
+- API Key 미입력 → 챗봇 탭에서 안내 메시지 표시, 다른 탭은 정상 동작
+- 좌표 컬럼 미감지 → 지도 시각화만 비활성화, 통계/차트는 정상 표시
+
+### 13.3 예외 처리 패턴
+
+- try-except 블록에서 구체적인 예외 타입 명시
+- **bare except 사용 금지**
+
+**bare except란?**
+예외 타입을 명시하지 않고 모든 예외를 포괄적으로 잡는 패턴.
+디버깅을 어렵게 하고 예상치 못한 에러를 숨길 수 있어 금지.
+
+```python
+# 나쁜 예 (bare except)
+try:
+    result = process_data(df)
+except:  # ← 어떤 에러인지 알 수 없음
+    pass
+
+# 좋은 예 (구체적 예외 타입 명시)
+try:
+    result = process_data(df)
+except ValueError as e:
+    st.error(f"데이터 형식 오류: {e}")
+except KeyError as e:
+    st.error(f"필수 컬럼 누락: {e}")
+except Exception as e:
+    st.error(f"예상치 못한 오류: {e}")
+    logging.exception("process_data 실패")
+```
+
+### 13.4 에러 명세서
+
+상세 에러 케이스는 `docs/error_explanation.md` 참조
+
+---
+
+## XIV. Environment & Configuration
+
+### 14.1 환경 변수
+
+- API Key 등 민감 정보: `.env` 파일에 보관
+- `.env` 파일은 `.gitignore`에 포함하여 버전 관리에서 제외
+- 하드코딩 금지
+
+### 14.2 Streamlit 설정
+
+- 앱 설정: `.streamlit/config.toml`
+- 배포 환경 secrets: `.streamlit/secrets.toml` (Streamlit Community Cloud 전용)
+
+### 14.3 배포 환경
+
+- Streamlit Community Cloud 기준
+- `requirements.txt` 최신 유지 (pyproject.toml과 동기화 필수)
+- Python 버전 명시 (runtime.txt 또는 pyproject.toml)
+
+---
+
+## XV. Code Review Checklist
+
+- [ ] 타입 힌트 적용 여부
+- [ ] Docstring 작성 여부
+- [ ] 테스트 코드 존재 여부
+- [ ] 한글 주석/문서 규칙 준수
+- [ ] 구체적 예외 타입 명시 (bare except 금지)
+
+---
+
+## XVI. AI/ML Guidelines
+
+### 16.1 모델 파일 관리
+
+- 모델 파일 위치: `model/` 디렉토리
+- 필수 파일: 모델(.pkl), 인코더(.pkl), 피처 설정(.json)
+
+### 16.2 추론 함수 규칙
+
+- 입력 검증 필수 (필수 컬럼, 데이터 타입)
+- 예측 실패 시 명확한 에러 메시지
+- 배치 예측 지원
+
+---
+
 ## Development Workflow (개발 워크플로우)
 
 **환경 요구사항**:
@@ -342,9 +536,8 @@ streamlit run app.py
 - Python Code Style (섹션 VII) 준수 필수
 
 **테스트 전략**:
-- 교육 프로젝트에는 수동 탐색적 테스트로 충분
-- 자동화된 테스트는 선택사항이며 복잡성을 추가해서는 안 된다(MUST NOT)
-- 검증 초점: 데이터 로딩, 시각화 렌더링, UI 반응성
+- TDD 방법론 적용 (섹션 XII 참조)
+- 검증 초점: 데이터 로딩, 전처리, 시각화 렌더링, ML 추론
 
 ---
 
@@ -378,7 +571,8 @@ streamlit run app.py
 | v1.0.0 | 2025-11-21 | 최초 제정 - 5개 핵심 원칙 정의 |
 | v1.1.0 | 2025-12-01 | docs/constitution.md 통합 - Git 규칙, 코드 스타일, 데이터 처리, 의존성, 문서화 규칙 추가 |
 | v1.2.0 | 2025-12-02 | v1.1 앱 개선사항 반영 - anthropic 패키지 추가, CSV 업로드 방식, AI 챗봇 범위 추가 |
+| v1.3.0 | 2025-12-11 | v1.3 배포 준비 - TDD, Error Handling, AI/ML Guidelines, 브랜치 전략, 환경 설정 추가; 의존성 14개로 확장 |
 
 ---
 
-**Version**: 1.2.0 | **Ratified**: 2025-11-21 | **Last Amended**: 2025-12-02
+**Version**: 1.3.0 | **Ratified**: 2025-11-21 | **Last Amended**: 2025-12-11
