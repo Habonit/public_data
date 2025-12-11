@@ -80,38 +80,52 @@ def function_name(param1: str, param2: int) -> dict:
     Raises:
         ValueError: 에러 상황 설명
     """
-
+```
 ---
 
 ## 3. Data Handling Rules
 
 ### 3.1 CSV 인코딩
-- 기본 인코딩 시도 순서: `UTF-8` → `UTF-8-SIG` → `CP949`
+- 기본 인코딩 시도 순서: ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
 - 한글 파일명 지원 필수
 
 ### 3.2 좌표 컬럼 감지
 위도/경도 컬럼명 후보:
-- 위도: `lat`, `latitude`, `위도`, `y좌표`, `y`
-- 경도: `lng`, `lon`, `longitude`, `경도`, `x좌표`, `x`
+  위도: `lat`, `latitude`, `위도`, `y좌표`, `y`, `Lat`, `Latitude`
+  경도: `lng`, `lon`, `longitude`, `경도`, `x좌표`, `x`, `Lng`, `Lon`, `Longitude`
+
 
 ### 3.3 성능 제한
 - 지도 시각화 최대 포인트: **5,000개** (초과 시 샘플링)
 - 근접성 분석 최대 행: **5,000행** (초과 시 샘플링)
 - 범주형 컬럼 상위 표시: **20개**
 
+### 3.4 전처리 파이프라인
+- 전처리 함수는 `utils/preprocessing.py`에 모듈화
+- 원본 데이터 변경 금지 (복사본 사용)
+- 전처리 결과는 session_state에 캐싱
+
 ---
 
 ## 4. Dependencies
 
 ### 필수 패키지
-| 패키지 | 최소 버전 | 용도 |
-|--------|----------|------|
-| streamlit | 1.28.0 | 웹 프레임워크 |
-| pandas | 2.0.0 | 데이터 처리 |
-| numpy | 1.24.0 | 수치 연산 |
-| plotly | 5.17.0 | 대화형 차트 |
-| folium | 0.14.0 | 지도 시각화 |
-| streamlit-folium | 0.15.0 | Folium-Streamlit 통합 |
+  | 패키지 | 최소 버전 | 용도 |
+  |--------|----------|------|
+  | streamlit | 1.28.0 | 웹 프레임워크 |
+  | pandas | 2.0.0 | 데이터 처리 |
+  | numpy | 1.24.0 | 수치 연산 |
+  | plotly | 5.17.0 | 대화형 차트 |
+  | folium | 0.14.0 | 지도 시각화 |
+  | streamlit-folium | 0.15.0 | Folium-Streamlit 통합 |
+  | matplotlib | 3.8.0 | 추가 시각화 |
+  | openpyxl | 3.1.5 | Excel 파일 지원 |
+  | anthropic | 0.39.0 | AI 챗봇 API |
+  | langchain | 0.3.0 | LLM 프레임워크 |
+  | langchain-anthropic | 0.3.0 | Anthropic 연동 |
+  | langgraph | 0.2.0 | Tool Calling 워크플로우 |
+  | scikit-learn | 1.7.2 | ML 유틸리티 |
+  | lightgbm | 4.6.0 | ECLO 예측 모델 |
 
 ---
 
@@ -166,10 +180,162 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 - 코드 예시: 원본 유지
 - 기술 용어 및 명령어: 원문 (예: `streamlit run`, `git commit`)
 
-### 7 브랜치 전략
+---
+
+## 7. 브랜치 전략
+
+### 7.1 브랜치 네이밍
 - spec 문서를 만들 때의 이름으로 브랜치를 쓰지 않는다
-- 무조건 버전 이름으로만 브랜치를 딴다.
-- 형태 version/v{실제 버전}
+- 무조건 버전 이름으로만 브랜치를 딴다
+- 형태: `version/{실제 버전}` (예: `version/1.3`)
+
+### 7.2 버전 번호 규칙
+- **Major (x.0.0)**: 대규모 기능 추가 또는 Breaking Change
+- **Minor (1.x.0)**: 신규 기능 추가
+- **Patch (1.2.x)**: 버그 수정 및 소규모 개선
+
+### 7.3 릴리스 절차
+1. `app_improvement_proposal.md` 작성
+2. 테스트 코드 작성 (TDD)
+3. 구현 및 테스트 통과 확인
+4. README.md 버전 히스토리 업데이트
+
+---
+
+## 8. TDD (Test-Driven Development) 방법론
+
+### 8.1 개발 프로세스
+1. **제안서 작성**: `docs/v{버전}/app_improvement_proposal.md` 작성
+2. **테스트 코드 작성**: 구현 전에 테스트 코드를 먼저 작성
+3. **구현**: 테스트를 통과하도록 기능 구현
+4. **검증**: 모든 테스트 통과 확인
+
+### 8.2 테스트 코드 규칙
+- **테스트 위치**: `tests/` 디렉토리
+- **테스트 파일명**: `test_<모듈명>.py`
+- **테스트 함수명**: `test_<기능명>_<상황>` (예: `test_preprocess_datetime_valid_input`)
+- **테스트 프레임워크**: pytest
+
+### 8.3 테스트 작성 순서
+```python
+# 1. 정상 케이스 (Happy Path)
+def test_preprocess_datetime_valid_input():
+    ...
+
+# 2. 경계 케이스 (Edge Case)
+def test_preprocess_datetime_midnight():
+    ...
+
+# 3. 예외 케이스 (Error Case)
+def test_preprocess_datetime_missing_column():
+    ...
+```
+
+### 8.4 테스트 실행
+```bash
+# 전체 테스트 실행
+pytest tests/
+
+# 특정 테스트 파일 실행
+pytest tests/test_preprocessing.py
+
+# 커버리지 포함 실행
+pytest tests/ --cov=utils
+```
+
+### 8.5 TDD 적용 대상
+- `app_improvement_proposal.md`에 정의된 모든 신규 기능
+- 전처리 함수 및 유틸리티 함수
+- ML 모델 추론 관련 함수
+
+---
+
+## 9. Error Handling
+
+### 9.1 예외 처리 원칙
+- 사용자에게 친절한 한글 에러 메시지 제공
+- 내부 에러 로깅과 사용자 메시지 분리
+- 복구 가능한 에러는 Graceful Degradation 적용
+
+### 9.2 Graceful Degradation (우아한 성능 저하)
+시스템의 일부 기능이 실패하더라도 전체 시스템이 중단되지 않고,
+가능한 범위 내에서 서비스를 계속 제공하는 설계 원칙.
+
+**예시:**
+- ML 모델 로딩 실패 → ECLO 예측 기능만 비활성화, 나머지 앱은 정상 동작
+- API Key 미입력 → 챗봇 탭에서 안내 메시지 표시, 다른 탭은 정상 동작
+- 좌표 컬럼 미감지 → 지도 시각화만 비활성화, 통계/차트는 정상 표시
+
+### 9.3 예외 처리 패턴
+- try-except 블록에서 구체적인 예외 타입 명시
+- **bare except 사용 금지**
+
+**bare except란?**
+예외 타입을 명시하지 않고 모든 예외를 포괄적으로 잡는 패턴.
+디버깅을 어렵게 하고 예상치 못한 에러를 숨길 수 있어 금지.
+
+```python
+# 나쁜 예 (bare except)
+try:
+    result = process_data(df)
+except:  # ← 어떤 에러인지 알 수 없음
+    pass
+
+# 좋은 예 (구체적 예외 타입 명시)
+try:
+    result = process_data(df)
+except ValueError as e:
+    st.error(f"데이터 형식 오류: {e}")
+except KeyError as e:
+    st.error(f"필수 컬럼 누락: {e}")
+except Exception as e:
+    st.error(f"예상치 못한 오류: {e}")
+    logging.exception("process_data 실패")
+```
+
+### 9.4 에러 명세서
+상세 에러 케이스는 `docs/error_explanation.md` 참조
+
+---
+
+## 10. Environment & Configuration
+
+### 10.1 환경 변수
+- API Key 등 민감 정보: `.env` 파일에 보관
+- `.env` 파일은 `.gitignore`에 포함하여 버전 관리에서 제외
+- 하드코딩 금지
+
+### 10.2 Streamlit 설정
+- 앱 설정: `.streamlit/config.toml`
+- 배포 환경 secrets: `.streamlit/secrets.toml` (Streamlit Community Cloud 전용)
+
+### 10.3 배포 환경
+- Streamlit Community Cloud 기준
+- `requirements.txt` 최신 유지 (pyproject.toml과 동기화 필수)
+- Python 버전 명시 (runtime.txt 또는 pyproject.toml)
+
+---
+
+## 11. Code Review Checklist
+
+- [ ] 타입 힌트 적용 여부
+- [ ] Docstring 작성 여부
+- [ ] 테스트 코드 존재 여부
+- [ ] 한글 주석/문서 규칙 준수
+- [ ] 구체적 예외 타입 명시 (bare except 금지)
+
+---
+
+## 12. AI/ML Guidelines
+
+### 12.1 모델 파일 관리
+- 모델 파일 위치: `model/` 디렉토리
+- 필수 파일: 모델(.pkl), 인코더(.pkl), 피처 설정(.json)
+
+### 12.2 추론 함수 규칙
+- 입력 검증 필수 (필수 컬럼, 데이터 타입)
+- 예측 실패 시 명확한 에러 메시지
+- 배치 예측 지원
 
 ---
 
@@ -178,6 +344,7 @@ def load_dataset(dataset_name: str) -> pd.DataFrame:
 | 버전 | 문서 위치 | 설명 |
 |------|----------|------|
 | v1.0 | `docs/v1.0/daegu_constitution.md` | Spec 주도 개발(SDD)에서 최초 생성된 Constitution |
-| v1.1 | `docs/constitution.md` | #1 ~ #6까지 constitution에 반영 | 
-| v1.2.4 | `docs/constitution.md` | #7까지 constitution에 반영 | 
+| v1.1 | `docs/constitution.md` | #1 ~ #6까지 constitution에 반영 |
+| v1.2.4 | `docs/constitution.md` | #7까지 constitution에 반영 |
+| v1.3 | `docs/constitution.md` | #3, #4, #7 수정, #8, #9, #10, #11, #12 추가하여 constitution에 반영 | 
 
