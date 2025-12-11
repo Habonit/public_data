@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import streamlit as st
 from typing import BinaryIO
+from utils.preprocessing import preprocess_accident_datetime
 
 
 def read_csv_safe(file_path: str) -> pd.DataFrame:
@@ -102,6 +103,9 @@ def read_uploaded_csv(uploaded_file: BinaryIO) -> pd.DataFrame:
                 if len(df) > 0:
                     df.columns = df.iloc[0].astype(str)
                     df = df[1:].reset_index(drop=True)
+
+            # v1.3: 사고일시 전처리 적용
+            df = preprocess_accident_datetime(df)
 
             return df
         except UnicodeDecodeError as e:

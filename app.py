@@ -569,8 +569,41 @@ def render_dataset_tab(dataset_name: str, dataset_display_name: str):
 def render_overview_tab():
     """
     Render the project overview tab with upload functionality. (T016-T019)
+    v1.3: 교육용 앱 설명, DACON 대회 링크, 데이터 업로드 안내 추가 (FR-004, FR-005, FR-006)
     """
     st.header("📖 프로젝트 개요")
+
+    # v1.3: FR-004 - 교육용 앱 설명 (st.info)
+    st.info("""
+    **📚 교육용 Streamlit 애플리케이션**
+
+    이 앱은 데이터 분석 학습자를 위한 교육용 도구입니다.
+    대구시 공공데이터와 DACON 교통사고 데이터를 활용하여
+    데이터 탐색, 시각화, AI 기반 분석을 실습할 수 있습니다.
+    """)
+
+    # v1.3: FR-005 - DACON 대회 링크 (st.markdown)
+    st.markdown("""
+    ### 📊 데이터 출처
+
+    이 앱에서 사용하는 **훈련 데이터(train.csv)** 및 **테스트 데이터(test.csv)**는
+    DACON 대구 교통사고 피해 예측 AI 경진대회에서 제공됩니다.
+
+    👉 **[DACON 대회 페이지 바로가기](https://dacon.io/competitions/official/236193/overview/description)**
+    """)
+
+    # v1.3: FR-006 - 데이터 다운로드/업로드 안내
+    st.markdown("""
+    ### 📥 데이터 준비 방법
+
+    1. 위 DACON 대회 링크에 접속합니다
+    2. 대회 참가 후 **데이터** 탭에서 `train.csv`, `test.csv`를 다운로드합니다
+    3. 아래 **데이터 업로드** 섹션에서 파일을 업로드합니다
+    4. **훈련 데이터**, **테스트 데이터** 탭에서 데이터를 탐색합니다
+    5. **데이터 질의응답** 탭에서 AI 챗봇에 ECLO 예측을 요청할 수 있습니다
+    """)
+
+    st.markdown("---")
 
     # Project Introduction
     st.markdown("""
