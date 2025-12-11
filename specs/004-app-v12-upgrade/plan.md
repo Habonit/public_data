@@ -94,5 +94,5 @@ model/
 
 **정당화 근거**:
 - Constitution III (Educational Purpose)에 명시된 "Streamlit, 데이터 분석, 시각화 기초의 실습 학습 지원"을 LangGraph까지 확장
-- syllabus.md의 14-15일차가 LangGraph를 다루므로 실제 동작하는 예제 코드 필요
+- material/syllabus.md의 14-15일차가 LangGraph를 다루므로 실제 동작하는 예제 코드 필요
 - 코드 복잡도 증가를 최소화하기 위해 LangGraph의 고급 기능(Checkpointer)은 v1.2에서 제외

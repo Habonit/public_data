@@ -460,7 +460,7 @@ except Exception as e:
 
 ### 13.4 에러 명세서
 
-상세 에러 케이스는 `docs/error_explanation.md` 참조
+상세 에러 케이스는 `tests/error_explanation.md` 참조
 
 ---
 

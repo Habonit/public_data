@@ -36,7 +36,23 @@ streamlit run app.py
 
 ## 버전 히스토리
 
-### v1.3.1 (현재)
+### v1.3.2 (현재)
+
+**프로젝트 구조 정리** - 문서 파일 위치 재배치
+
+#### 주요 변경사항
+
+| 영역 | v1.3.1 | v1.3.2 |
+|:-----|:-------|:-------|
+| **syllabus.md** | 프로젝트 루트 | `material/syllabus.md` |
+| **error_explanation.md** | `docs/error_explanation.md` | `tests/error_explanation.md` |
+| **문서 참조** | 기존 경로 | 새 경로로 업데이트 |
+
+기준 문서: `docs/v1.3.2/app_improvement_proposal.md`
+
+---
+
+### v1.3.1
 
 **UI 문구 수정 및 코드 품질 개선** - 환영 문구 삭제, 복사 기능 개선, Deprecation Warning 수정
 
@@ -619,7 +635,7 @@ public_data/
 ├── app.py                 # Streamlit 메인 앱
 ├── pyproject.toml         # uv 패키지 매니저 설정 (v1.2.1+)
 ├── requirements.txt       # Python 의존성 (pip 호환)
-├── syllabus.md           # 15일 교육과정 커리큘럼
+├── commit_rule.md        # 커밋 규칙
 ├── data/                  # 대구 공공데이터 CSV
 │   ├── train.csv
 │   ├── test.csv
@@ -654,7 +670,8 @@ public_data/
 │   └── 005-v1-3-deploy-prep/
 ├── tests/                 # v1.3: 테스트 코드
 │   ├── conftest.py        # pytest 설정
-│   └── test_preprocessing.py  # 전처리 함수 테스트 (23개)
+│   ├── test_preprocessing.py  # 전처리 함수 테스트 (23개)
+│   └── error_explanation.md   # 에러 케이스 설명 문서
 └── material/              # 일차별 학습 자료
     ├── 01-03/            # 1~3일차
     ├── 03-07/            # 3~7일차
@@ -663,7 +680,8 @@ public_data/
     ├── 13/               # 13일차
     ├── 14/               # 14일차
     ├── 15/               # 15일차
-    └── 16-20/            # 16~20일차 (예정)
+    ├── 16-20/            # 16~20일차 (예정)
+    └── syllabus.md       # 전체 커리큘럼
 ```
 
 ---
@@ -693,13 +711,13 @@ public_data/
 | `specs/004-app-v12-upgrade/` | v1.2 스펙 산출물 (LangGraph, ECLO 예측) |
 | `specs/005-v1-3-deploy-prep/` | v1.3 스펙 산출물 (Streamlit 배포 준비) |
 | `material/` | 일차별 학습 자료 (아래 참조) |
-| `syllabus.md` | 전체 15일 커리큘럼 문서 |
+| `material/syllabus.md` | 전체 15일 커리큘럼 문서 |
 
 ---
 
 ## 학습 자료 (material/)
 
-15일 교육과정의 일차별 학습 자료입니다. 전체 커리큘럼은 `syllabus.md`를 참조하세요.
+15일 교육과정의 일차별 학습 자료입니다. 전체 커리큘럼은 `material/syllabus.md`를 참조하세요.
 
 ### 커리큘럼 개요
 
