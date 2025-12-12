@@ -6,12 +6,24 @@
 리포트는 tests/result/{yyyy_mm_dd_HH_MM}/test_report.md 경로에 저장됩니다.
 
 사용법:
+    # 기본 실행 (API 테스트 제외)
     uv run python scripts/generate_test_report.py
+
+    # 전체 테스트 실행
+    uv run python scripts/generate_test_report.py --all
+
+    # 특정 마커 필터
+    uv run python scripts/generate_test_report.py --filter api
+    uv run python scripts/generate_test_report.py --filter slow
+    uv run python scripts/generate_test_report.py --filter "not api"
+    uv run python scripts/generate_test_report.py --filter "not slow"
+    uv run python scripts/generate_test_report.py --filter "not api and not slow"
 
 출력 경로:
     tests/result/{yyyy_mm_dd_HH_MM}/test_report.md
     (예: tests/result/2025_12_12_18_30/test_report.md)
 """
+import argparse
 import subprocess
 import sys
 import json
@@ -20,9 +32,82 @@ from datetime import datetime
 from pathlib import Path
 
 
-def run_pytest_with_coverage(exclude_api: bool = True) -> tuple[str, str]:
-    """pytest를 실행하고 결과를 반환"""
-    # JSON 형식으로 테스트 결과 수집
+# 사전 정의된 필터 옵션
+FILTER_PRESETS = {
+    "all": None,  # 전체 테스트
+    "api": "api",  # API 테스트만
+    "slow": "slow",  # 느린 테스트만
+    "not-api": "not api",  # API 제외 (기본값)
+    "not-slow": "not slow",  # 느린 테스트 제외
+    "quick": "not api and not slow",  # 빠른 테스트 (API, slow 제외)
+    "integration": "integration",  # 통합 테스트만
+}
+
+
+def parse_args() -> argparse.Namespace:
+    """커맨드라인 인자 파싱"""
+    parser = argparse.ArgumentParser(
+        description="테스트 결과 및 커버리지 마크다운 리포트 생성",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+예제:
+  %(prog)s                          # 기본 (API 테스트 제외)
+  %(prog)s --all                    # 전체 테스트
+  %(prog)s --filter api             # API 테스트만
+  %(prog)s --filter slow            # 느린 테스트만
+  %(prog)s --filter "not api"       # API 제외
+  %(prog)s --filter "not slow"      # 느린 테스트 제외
+  %(prog)s --filter quick           # 빠른 테스트 (API, slow 제외)
+  %(prog)s --filter integration     # 통합 테스트만
+  %(prog)s --filter "api or slow"   # 커스텀 pytest 마커 표현식
+        """
+    )
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--all", "-a",
+        action="store_true",
+        help="전체 테스트 실행 (필터 없음)"
+    )
+    group.add_argument(
+        "--filter", "-f",
+        type=str,
+        metavar="MARKER",
+        help="pytest 마커 필터 (예: api, slow, 'not api', quick)"
+    )
+
+    return parser.parse_args()
+
+
+def get_marker_filter(args: argparse.Namespace) -> tuple[str | None, str]:
+    """인자에서 마커 필터와 설명 추출
+
+    Returns:
+        (marker_expression, description) 튜플
+    """
+    if args.all:
+        return None, "전체 테스트"
+
+    if args.filter:
+        # 사전 정의된 프리셋 확인
+        if args.filter in FILTER_PRESETS:
+            marker = FILTER_PRESETS[args.filter]
+            if marker is None:
+                return None, "전체 테스트"
+            return marker, f"`-m \"{marker}\"`"
+        # 커스텀 마커 표현식
+        return args.filter, f"`-m \"{args.filter}\"`"
+
+    # 기본값: not api
+    return "not api", "`-m \"not api\"` (기본값)"
+
+
+def run_pytest_with_coverage(marker_filter: str | None = None) -> tuple[str, str]:
+    """pytest를 실행하고 결과를 반환
+
+    Args:
+        marker_filter: pytest 마커 필터 표현식 (None이면 필터 없음)
+    """
     cmd = [
         sys.executable, "-m", "pytest", "tests/",
         "--cov=utils",
@@ -31,8 +116,8 @@ def run_pytest_with_coverage(exclude_api: bool = True) -> tuple[str, str]:
         "-q",
         "--no-header"
     ]
-    if exclude_api:
-        cmd.extend(["-m", "not api"])
+    if marker_filter:
+        cmd.extend(["-m", marker_filter])
 
     result = subprocess.run(
         cmd,
@@ -140,8 +225,20 @@ def get_coverage_badge(percent: float) -> str:
         return "🔴"
 
 
-def generate_markdown_report(test_results: dict, coverage_data: dict, marker_counts: dict = None) -> str:
-    """마크다운 리포트 생성"""
+def generate_markdown_report(
+    test_results: dict,
+    coverage_data: dict,
+    marker_counts: dict | None = None,
+    filter_description: str = ""
+) -> str:
+    """마크다운 리포트 생성
+
+    Args:
+        test_results: 테스트 결과 딕셔너리
+        coverage_data: 커버리지 데이터
+        marker_counts: 마커별 테스트 수
+        filter_description: 적용된 필터 설명
+    """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # 전체 커버리지
@@ -163,10 +260,13 @@ def generate_markdown_report(test_results: dict, coverage_data: dict, marker_cou
     # 모듈별 커버리지
     modules = get_module_coverage(coverage_data)
 
+    # 필터 정보 표시
+    filter_info = f"\n**테스트 필터**: {filter_description}\n" if filter_description else ""
+
     report = f"""# 테스트 결과 리포트
 
 **생성 시각**: {now}
-
+{filter_info}
 ---
 
 ## 요약
@@ -232,23 +332,23 @@ def generate_markdown_report(test_results: dict, coverage_data: dict, marker_cou
 ## 테스트 실행 방법
 
 ```bash
-# 전체 테스트 실행 (API 테스트 제외)
-uv run pytest tests/ -v -m "not api"
-
-# API 테스트 포함 전체 실행
-uv run pytest tests/ -v
-
-# 특정 마커만 실행
-uv run pytest tests/ -v -m "api"         # API 테스트만
-uv run pytest tests/ -v -m "integration" # 통합 테스트만
-uv run pytest tests/ -v -m "slow"        # 느린 테스트만
-
-# 커버리지 포함 실행
-uv run pytest tests/ --cov=utils --cov-report=term-missing -m "not api"
-
-# 이 리포트 생성
+# 기본 실행 (API 테스트 제외)
 uv run python scripts/generate_test_report.py
-# → tests/result/{{yyyy_mm_dd_HH_MM}}/test_report.md 에 저장됨
+
+# 전체 테스트 실행
+uv run python scripts/generate_test_report.py --all
+
+# 특정 필터 옵션
+uv run python scripts/generate_test_report.py --filter api             # API 테스트만
+uv run python scripts/generate_test_report.py --filter slow            # 느린 테스트만
+uv run python scripts/generate_test_report.py --filter "not api"       # API 제외
+uv run python scripts/generate_test_report.py --filter "not slow"      # 느린 테스트 제외
+uv run python scripts/generate_test_report.py --filter quick           # 빠른 테스트 (API, slow 제외)
+uv run python scripts/generate_test_report.py --filter integration     # 통합 테스트만
+
+# pytest 직접 실행
+uv run pytest tests/ -v -m "not api"
+uv run pytest tests/ --cov=utils --cov-report=term-missing
 ```
 
 ---
@@ -271,11 +371,14 @@ def get_output_path() -> Path:
 
 def main():
     """테스트 실행 및 리포트 생성 메인 함수"""
+    args = parse_args()
+    marker_filter, filter_description = get_marker_filter(args)
+
     # 테스트 시작 시각 기록 (출력 경로용)
     output_path = get_output_path()
 
-    print("🧪 테스트 실행 중...")
-    stdout, stderr = run_pytest_with_coverage()
+    print(f"🧪 테스트 실행 중... (필터: {filter_description})")
+    stdout, stderr = run_pytest_with_coverage(marker_filter)
 
     print("📊 결과 분석 중...")
     test_results = parse_test_results(stdout + stderr)
@@ -285,7 +388,7 @@ def main():
     marker_counts = count_tests_by_marker()
 
     print("📝 리포트 생성 중...")
-    report = generate_markdown_report(test_results, coverage_data, marker_counts)
+    report = generate_markdown_report(test_results, coverage_data, marker_counts, filter_description)
 
     # 출력 디렉토리 생성 및 파일 저장
     output_path.parent.mkdir(parents=True, exist_ok=True)
