@@ -338,7 +338,109 @@ Tool Calling이 "잘 되는지"는 여러 모듈(chatbot, graph, tools)이 협�
 
 ## 3. 테스트 실행 방법
 
-### 3.1 전체 테스트 실행
+### 3.0 테스트 현황 요약
+
+| 구분 | 테스트 수 | 예상 소요 시간 | 실행 조건 |
+|:-----|--------:|:--------------|:---------|
+| **전체 테스트** | 320개 | ~3분 | API Key 필요 |
+| `not api` (API 제외) | 296개 | ~30초 | API Key 불필요 |
+| `not api and not slow` (빠른 테스트) | 295개 | ~25초 | API Key 불필요 |
+| `api` (API 테스트만) | 24개 | ~2분 | API Key 필요 |
+| `slow` (느린 테스트) | 4개 | ~30초 | 일부 API Key 필요 |
+| `integration` (통합 테스트) | 41개 | ~20초 | 일부 API Key 필요 |
+
+### 3.1 상황별 테스트 가이드 🎯
+
+#### 🚀 빠르게 확인하고 싶을 때 (권장: 평소 개발 시)
+
+```bash
+# 가장 빠른 테스트 (~25초)
+# API 호출 없이 로컬에서 빠르게 검증
+uv run pytest -m "not api and not slow" -v
+```
+
+**적합한 상황:**
+- 코드 한두 줄 수정 후 빠르게 확인
+- 로컬에서 반복적으로 테스트
+- API Key가 없거나 API 비용을 아끼고 싶을 때
+
+---
+
+#### 📁 특정 모듈만 수정했을 때
+
+```bash
+# 수정한 모듈의 테스트만 실행
+uv run pytest tests/test_loader.py -v          # loader.py 수정 시
+uv run pytest tests/test_tools.py -v           # tools.py 수정 시
+uv run pytest tests/test_predictor.py -v       # predictor.py 수정 시
+
+# 관련 통합 테스트도 함께 실행 (권장)
+uv run pytest tests/test_loader.py tests/integration/test_data_pipeline.py -v
+```
+
+**모듈별 테스트 파일 매핑:**
+| 수정한 모듈 | 테스트 파일 | 관련 통합 테스트 |
+|:-----------|:-----------|:---------------|
+| `loader.py` | `test_loader.py` | `integration/test_data_pipeline.py` |
+| `tools.py` | `test_tools.py` | `integration/test_tool_calling.py` |
+| `predictor.py` | `test_predictor.py` | `integration/test_eclo_pipeline.py` |
+| `geo.py` | `test_geo.py` | `integration/test_map_visualization.py` |
+| `visualizer.py` | `test_visualizer.py` | `integration/test_map_visualization.py` |
+| `chatbot.py` | `test_chatbot.py` | `integration/test_tool_calling.py` |
+| `graph.py` | `test_graph.py` | `integration/test_tool_calling.py` |
+| `narration.py` | `test_narration.py` | - |
+| `prompts.py` | `test_prompts.py` | - |
+
+---
+
+#### ✅ Commit 전 (권장)
+
+```bash
+# API 제외한 전체 테스트 (~30초)
+uv run pytest -m "not api" -v
+```
+
+**적합한 상황:**
+- 기능 구현 완료 후 commit 전
+- 여러 파일을 수정한 경우
+- 회귀 버그 확인이 필요할 때
+
+---
+
+#### 🚢 PR 올리기 전 / 배포 전 (필수)
+
+```bash
+# 전체 테스트 실행 (~3분)
+export ANTHROPIC_API_KEY=sk-ant-xxxxx
+uv run pytest -v
+
+# 또는 커버리지와 함께
+uv run pytest --cov=utils --cov-report=term-missing -v
+```
+
+**적합한 상황:**
+- PR 생성 전 최종 확인
+- main 브랜치 머지 전
+- 배포 전 검증
+
+---
+
+#### 🔧 특정 마커만 테스트
+
+```bash
+# 통합 테스트만 (~20초)
+uv run pytest -m integration -v
+
+# API 테스트만 (~2분, API Key 필요)
+uv run pytest -m api -v
+
+# 느린 테스트만 (~30초)
+uv run pytest -m slow -v
+```
+
+---
+
+### 3.2 기본 명령어
 
 ```bash
 # API 테스트 제외 (API Key 없을 때)
@@ -348,7 +450,7 @@ uv run pytest tests/ -m "not api" -v
 uv run pytest tests/ -v
 ```
 
-### 3.2 특정 테스트만 실행
+### 3.3 특정 테스트만 실행
 
 ```bash
 # 특정 파일
@@ -361,7 +463,7 @@ uv run pytest tests/test_preprocessing.py::test_hour_to_period_commute_morning -
 uv run pytest tests/test_preprocessing.py::TestHourToPeriod -v
 ```
 
-### 3.3 마커로 필터링
+### 3.4 마커로 필터링
 
 ```bash
 # API 테스트만
@@ -374,7 +476,7 @@ uv run pytest -m integration -v
 uv run pytest -m "not slow" -v
 ```
 
-### 3.4 커버리지 측정
+### 3.5 커버리지 측정
 
 ```bash
 # 터미널 출력
@@ -510,27 +612,33 @@ jobs:
 ```
 tests/
 ├── conftest.py                 # 공통 fixture 정의
+├── __init__.py                 # 패키지 초기화
 ├── principle.md                # 테스트 원칙 및 방법론 (추상적)
 ├── README.md                   # 본 문서 (실천적 가이드)
 ├── error_explanation.md        # 에러 케이스 설명
 │
-├── test_preprocessing.py       # utils/preprocessing.py 테스트
-├── test_loader.py              # utils/loader.py 테스트
-├── test_tools.py               # utils/tools.py 테스트 (22개 도구 전체)
-├── test_predictor.py           # utils/predictor.py 테스트 (ECLO 예측)
-├── test_geo.py                 # utils/geo.py 테스트
-├── test_narration.py           # utils/narration.py 테스트
-├── test_graph.py               # utils/graph.py 테스트 (라우팅 로직)
-├── test_chatbot.py             # utils/chatbot.py 테스트 (@pytest.mark.api)
-├── test_visualizer.py          # utils/visualizer.py 테스트 (선택)
+├── test_preprocessing.py       # utils/preprocessing.py 테스트 (23개)
+├── test_loader.py              # utils/loader.py 테스트 (18개)
+├── test_tools.py               # utils/tools.py 테스트 (40개)
+├── test_predictor.py           # utils/predictor.py 테스트 (23개)
+├── test_geo.py                 # utils/geo.py 테스트 (25개)
+├── test_narration.py           # utils/narration.py 테스트 (23개)
+├── test_graph.py               # utils/graph.py 테스트 (14개, @api 3개)
+├── test_chatbot.py             # utils/chatbot.py 테스트 (44개, @api 17개)
+├── test_visualizer.py          # utils/visualizer.py 테스트 (40개)
+├── test_prompts.py             # utils/prompts.py 테스트 (29개)
 │
-└── integration/                # 통합 테스트
+├── result/                     # 테스트 리포트 저장 디렉토리
+│   └── {yyyy_mm_dd_HH_MM}/     # 실행 시각별 디렉토리
+│       └── test_report.md      # 테스트 결과 마크다운 리포트
+│
+└── integration/                # 통합 테스트 (41개)
     ├── conftest.py             # 통합 테스트 전용 fixture
-    ├── test_data_pipeline.py   # INT-001, INT-002
-    ├── test_tool_calling.py    # INT-003 (@pytest.mark.api)
-    ├── test_map_visualization.py  # INT-004
-    ├── test_eclo_pipeline.py   # INT-005 (ECLO 예측 파이프라인)
-    └── test_narration_pipeline.py  # INT-006 (내레이션 생성)
+    ├── __init__.py             # 패키지 초기화
+    ├── test_data_pipeline.py   # INT-001, INT-002 (10개)
+    ├── test_tool_calling.py    # INT-003 (13개, @api 5개)
+    ├── test_map_visualization.py  # INT-004 (9개)
+    └── test_eclo_pipeline.py   # INT-005 (9개)
 ```
 
 ---
