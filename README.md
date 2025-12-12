@@ -1,8 +1,47 @@
 # 대구 공공데이터 시각화
 
+> **코드 없이 대화로 데이터를 탐색하는 AI 챗봇 기반 EDA 도구**
+
 대구 지역 공공데이터를 탐색·분석하는 교육용 Streamlit 애플리케이션입니다.
 
-데이터 출처: [DACON 대구 교통사고 피해 예측 AI 경진대회](https://dacon.io/competitions/official/236193/overview/description)
+- **교육 기간**: 2025-11 ~ 2025-12
+- **데이터 출처**: [DACON 대구 교통사고 피해 예측 AI 경진대회](https://dacon.io/competitions/official/236193/overview/description)
+
+---
+
+## TODO
+
+향후 개선 예정 사항입니다.
+
+| 우선순위 | 항목 | 설명 |
+|:--------:|:-----|:-----|
+| P0 | Buffer Memory 토큰 최적화 | 현재 Buffer Memory 사용으로 인한 토큰 사용량 과다를 최소화 |
+| P1 | LLMOps 시스템 구축 | Langfuse 설정을 통한 LLM 모니터링 및 추적 체계 구축 |
+| P2 | ML 모델 개선 | 머신 러닝 모델 개선을 통한 ECLO 예측 정확도 향상 |
+| P3 | MLOps 시스템 구축 | 모델 배포 자동화를 통한 MLOps 파이프라인 설정 |
+
+---
+
+## 포지셔닝
+
+```
+        [분석 깊이]
+            ↑
+            │
+   전문 BI 도구  │  AI 데이터 사이언티스트
+   (Tableau)    │  (Auto-Insight)
+                │
+    ────────────┼────────────→ [AI 자율성]
+                │
+   엑셀/구글시트 │  ★ 현재 앱
+   (수동 분석)   │  (AI 보조 EDA)
+                │
+            낮음
+```
+
+**현재 위치**: AI가 보조하는 셀프서비스 데이터 탐색 도구
+- 사용자 질문에 AI가 Tool Calling으로 응답
+- LangGraph 기반 22개 분석 도구 + ECLO 예측
 
 ---
 
@@ -36,7 +75,89 @@ streamlit run app.py
 
 ## 버전 히스토리
 
-### v1.3.2 (현재)
+### v2.0.1 (현재)
+
+**TDD 실제 적용** - 320개 테스트 코드 작성 및 72.3% 커버리지 달성
+
+#### 주요 변경사항
+
+| 영역 | v2.0 | v2.0.1 |
+|:-----|:-----|:-------|
+| **테스트 코드** | 문서만 작성 | 320개 테스트 작성 완료 |
+| **코드 커버리지** | 0% | 72.3% (1024/1416 statements) |
+| **pytest 마커** | 정의만 | api(24), slow(4), integration(41) 적용 |
+
+#### 테스트 현황
+
+| 지표 | 값 |
+|:-----|:---|
+| 총 테스트 | 320개 |
+| 성공률 | 100% (API 테스트 제외 시 296개 pass) |
+| 코드 커버리지 | 72.3% |
+| 실행 시간 | ~5초 (API 제외) / ~13분 (전체) |
+
+#### 테스트 파일 구성
+
+| 파일 | 테스트 수 | 설명 |
+|:-----|--------:|:-----|
+| `test_preprocessing.py` | 23개 | 전처리 모듈 |
+| `test_loader.py` | 28개 | 데이터 로더 |
+| `test_tools.py` | 135개 | 22개 분석 도구 |
+| `test_predictor.py` | 31개 | ECLO 예측 |
+| `test_geo.py` | 20개 | 지리 분석 |
+| `test_visualizer.py` | 20개 | 시각화 |
+| `test_narration.py` | 15개 | 내러티브 생성 |
+| `test_graph.py` | 14개 | LangGraph 워크플로우 |
+| `test_prompts.py` | 10개 | 프롬프트 검증 |
+| `test_chatbot.py` | 24개 | 챗봇 기능 |
+
+#### 테스트 실행 방법
+
+```bash
+# 빠른 테스트 (API/느린 테스트 제외, ~25초)
+uv run pytest tests/ -v -m "not api and not slow"
+
+# 일반 테스트 (API 테스트 제외, ~30초)
+uv run pytest tests/ -v -m "not api"
+
+# 전체 테스트 (~13분, ANTHROPIC_API_KEY 필요)
+uv run pytest tests/ -v
+
+# 테스트 리포트 생성
+uv run python scripts/generate_test_report.py
+# → tests/result/{yyyy_mm_dd_HH_MM}/test_report.md 에 저장
+```
+
+기준 문서: `docs/v2.0.1/app_improvement_proposal.md`
+
+---
+
+### v2.0
+
+**TDD 방법론 문서화** - 테스트 주도 개발 체계 구축
+
+#### 주요 변경사항
+
+| 영역 | v1.3.2 | v2.0 |
+|:-----|:-------|:-----|
+| **테스트 문서** | 없음 | TDD 방법론 문서 작성 |
+| **테스트 원칙** | 없음 | 10개 원칙 정의 |
+| **CI/CD 템플릿** | 없음 | GitHub Actions 템플릿 |
+
+#### 생성된 TDD 문서
+
+| 파일 | 설명 |
+|:-----|:-----|
+| `tests/principle.md` | TDD 방법론 10개 원칙 |
+| `tests/TEST_README_TEMPLATE.md` | 프로젝트별 TDD 룰 템플릿 |
+| `tests/README.md` | 해당 프로젝트 TDD 룰 |
+| `tests/workflow_template.yaml` | GitHub Actions CI/CD 템플릿 |
+
+기준 문서: `docs/v2.0/app_improvement_proposal.md`
+
+---
+
+### v1.3.2
 
 **프로젝트 구조 정리** - 문서 파일 위치 재배치
 
@@ -668,10 +789,25 @@ public_data/
 │   ├── 003-app-v111-upgrade/
 │   ├── 004-app-v12-upgrade/
 │   └── 005-v1-3-deploy-prep/
-├── tests/                 # v1.3: 테스트 코드
+├── scripts/               # v2.0.1: 유틸리티 스크립트
+│   └── generate_test_report.py  # 테스트 리포트 생성
+├── tests/                 # v2.0.1: 테스트 코드 (320개)
 │   ├── conftest.py        # pytest 설정
-│   ├── test_preprocessing.py  # 전처리 함수 테스트 (23개)
-│   └── error_explanation.md   # 에러 케이스 설명 문서
+│   ├── test_preprocessing.py  # 전처리 모듈 테스트 (23개)
+│   ├── test_loader.py     # 데이터 로더 테스트 (28개)
+│   ├── test_tools.py      # 분석 도구 테스트 (135개)
+│   ├── test_predictor.py  # ECLO 예측 테스트 (31개)
+│   ├── test_geo.py        # 지리 분석 테스트 (20개)
+│   ├── test_visualizer.py # 시각화 테스트 (20개)
+│   ├── test_narration.py  # 내러티브 테스트 (15개)
+│   ├── test_graph.py      # LangGraph 테스트 (14개)
+│   ├── test_prompts.py    # 프롬프트 테스트 (10개)
+│   ├── test_chatbot.py    # 챗봇 테스트 (24개)
+│   ├── integration/       # 통합 테스트 (41개)
+│   ├── result/            # 테스트 리포트 출력
+│   ├── README.md          # 테스트 가이드
+│   ├── principle.md       # TDD 방법론 원칙
+│   └── error_explanation.md   # 에러 케이스 설명
 └── material/              # 일차별 학습 자료
     ├── 01-03/            # 1~3일차
     ├── 03-07/            # 3~7일차
@@ -705,6 +841,9 @@ public_data/
 | `docs/v1.2.7/*.md` | v1.2.7 개선 제안서 (UX 향상, 도구 토글화, 워크플로우 정교화) |
 | `docs/v1.3/*.md` | v1.3 개선 제안서 (사고일시 전처리, 의존성 동기화) |
 | `docs/v1.3.1/*.md` | v1.3.1 개선 제안서 (UI 문구 수정, Deprecation 수정) |
+| `docs/v1.3.2/*.md` | v1.3.2 개선 제안서 (프로젝트 구조 정리) |
+| `docs/v2.0/*.md` | v2.0 개선 제안서 (TDD 방법론 문서화) |
+| `docs/v2.0.1/*.md` | v2.0.1 개선 제안서 (TDD 실제 적용, 320개 테스트) |
 | `specs/001-daegu-data-viz/` | v1.0 스펙 산출물 (spec, plan, tasks) |
 | `specs/002-app-v1-1-upgrade/` | v1.1 스펙 산출물 |
 | `specs/003-app-v111-upgrade/` | v1.1.1 스펙 산출물 |

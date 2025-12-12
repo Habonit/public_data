@@ -4,9 +4,19 @@
 
 경북 공공데이터를 바탕으로 데이터 분석, 시각화를 수행하고 최신 개발 방법론인 **SDD(Spec-Driven Development, 스펙주도개발)**를 활용하여 Streamlit 기반 데이터 시각화 앱을 구현합니다. 나아가 **언어모델과 Tool Calling**을 통해 자연어 기반으로 인터랙티브하게 데이터를 분석하는 AI 챗봇까지 개발합니다.
 
-- **교육 기간**: 15일
+- **교육 기간**: 20일
 - **실습 환경**: Google Colab, VS Code
-- **핵심 기술**: Python, Streamlit, Anthropic Claude API, LangChain, LangGraph
+- **핵심 기술**: Python, Streamlit, Anthropic Claude API, LangChain, LangGraph, pytest
+
+### 핵심 키워드
+
+| 분류 | 키워드 |
+|:-----|:-------|
+| 데이터 분석 | 데이터 기반 의사 결정, EDA, 데이터 시각화 |
+| 모델링 | 설명력 높은 모델, R², AutoML |
+| 웹 앱 개발 | Streamlit, cache, session_state 관리 |
+| AI/LLM | LangChain, LangGraph, Tool Calling, Memory 관리 |
+| 개발 방법론 | SDD (Spec-Driven Development), TDD (Test-Driven Development), Speckit |
 
 ---
 
@@ -22,6 +32,9 @@
 ├─────────────────────────────────────────────────────────────────────┤
 │  Phase 3: AI 챗봇 통합 (11~15일차)                                   │
 │  - 앱 업그레이드, Tool Calling, 메모리 관리, AI 에이전트 구현          │
+├─────────────────────────────────────────────────────────────────────┤
+│  Phase 4: 고도화 및 TDD (16~20일차)                                  │
+│  - LangGraph 전환, ECLO 예측, 배포, TDD 방법론 적용                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -308,6 +321,147 @@ Summary: START → chatbot ↔ tools → summarizer → END
 
 ---
 
+## Phase 4: 고도화 및 TDD (16~20일차)
+
+### 16일차: App Version 1.2 - LangGraph 아키텍처 전환
+
+**학습 목표**: LangGraph 기반 Tool Calling 아키텍처 전환 및 ECLO 예측 기능 통합
+
+| 구분 | v1.1.3 | v1.2 |
+|:-----|:-------|:-----|
+| Tool Calling 방식 | Anthropic API 직접 호출 | LangChain + LangGraph |
+| 도구 실행 노드 | 커스텀 루프 | LangGraph `ToolNode` |
+| 상태 관리 | 수동 메시지 리스트 | `add_messages` Reducer |
+| 패키지 관리 | pip | uv |
+| ECLO 예측 | 미지원 | 대화형 예측 지원 |
+
+**신규 모듈**:
+- `utils/graph.py`: LangGraph 워크플로우 정의
+- `utils/predictor.py`: ECLO 예측 모듈
+- `utils/prompts.py`: 프롬프트 템플릿 분리
+
+**ECLO 예측 필수 피처 (11개)**:
+- 범주형: 기상상태, 노면상태, 도로형태, 사고유형, 시간대, 시군구, 요일
+- 수치형: 사고시, 사고연, 사고월, 사고일
+
+---
+
+### 17일차: App Version 1.2.x - 점진적 개선
+
+**학습 목표**: 버그 수정, 코드 품질 개선, UX 향상
+
+| 버전 | 핵심 변경사항 |
+|:-----|:-------------|
+| v1.2.1 | uv 실행 오류 해결, API Key 검증, Streamlit 경고 처리 |
+| v1.2.3 | 프롬프트 분리, README 도구 목록 상세화, 다중 ECLO 예측 |
+| v1.2.5 | 테스트 데이터 헤더 수정, material 넘버링 통일 |
+| v1.2.7 | 긴 표 expander 처리, 도구 목록 UI 개선 (22개) |
+
+**핵심 개선 사항**:
+- `use_container_width` → `width` 마이그레이션
+- 다중 행 ECLO 예측 지원
+- LangGraph 워크플로우 다이어그램 정교화
+
+---
+
+### 18일차: App Version 1.3 - Streamlit Cloud 배포
+
+**학습 목표**: Streamlit Community Cloud 배포 준비 및 실행
+
+| 구분 | v1.2.7 | v1.3 |
+|:-----|:-------|:-----|
+| 배포 환경 | 로컬 전용 | Streamlit Cloud |
+| 데이터 전처리 | 부분 적용 | ML 모델용 전처리 완비 |
+| 의존성 관리 | pyproject.toml | requirements.txt 동기화 |
+
+**ML 모델 전처리 규칙**:
+```python
+def hour_to_period(h):
+    if 7 <= h <= 9:
+        return "출근시간대"
+    elif 17 <= h <= 19:
+        return "퇴근시간대"
+    elif 22 <= h or h <= 5:
+        return "심야"
+    else:
+        return "일반시간대"
+```
+
+**v1.3.1 ~ v1.3.2 추가 개선**:
+- 프로젝트 개요 문구 수정
+- AI 응답 복사 버튼 추가 (마크다운 형태)
+- 파일 위치 정리 (`syllabus.md`, `error_explanation.md`)
+
+---
+
+### 19일차: App Version 2.0 - TDD 방법론 문서화
+
+**학습 목표**: 테스트 주도 개발(TDD) 방법론 이해 및 문서 작성
+
+| 파일 | 설명 |
+|:-----|:-----|
+| `tests/principle.md` | TDD 방법론 원칙 |
+| `tests/TEST_README_TEMPLATE.md` | 프로젝트별 TDD 룰 템플릿 |
+| `tests/README.md` | 해당 프로젝트 TDD 룰 |
+| `tests/workflow_template.yaml` | GitHub Actions CI/CD 템플릿 |
+
+**TDD 핵심 원칙**:
+1. Red: 실패하는 테스트 작성
+2. Green: 테스트 통과하는 최소 코드 작성
+3. Refactor: 코드 개선
+
+---
+
+### 20일차: App Version 2.0.1 - TDD 실제 적용
+
+**학습 목표**: pytest 기반 테스트 코드 작성 및 커버리지 관리
+
+**테스트 현황**:
+
+| 지표 | 값 |
+|:-----|:---|
+| 총 테스트 | 320개 |
+| 성공률 | 100% (API 테스트 제외) |
+| 코드 커버리지 | 72.3% |
+
+**pytest 마커 분류**:
+
+| 마커 | 테스트 수 | 설명 |
+|:-----|--------:|:-----|
+| `@pytest.mark.api` | 24개 | 외부 API 호출 필요 |
+| `@pytest.mark.slow` | 4개 | 실행 시간 10초+ |
+| `@pytest.mark.integration` | 41개 | 모듈 간 통합 테스트 |
+
+**테스트 파일 구조**:
+```
+tests/
+├── test_preprocessing.py   # 전처리 모듈
+├── test_loader.py          # 데이터 로더
+├── test_tools.py           # 22개 분석 도구
+├── test_predictor.py       # ECLO 예측
+├── test_geo.py             # 지리 분석
+├── test_visualizer.py      # 시각화
+├── test_narration.py       # 내러티브 생성
+├── test_graph.py           # LangGraph 워크플로우
+├── test_prompts.py         # 프롬프트 검증
+├── test_chatbot.py         # 챗봇 기능
+└── integration/            # 통합 테스트
+```
+
+**테스트 실행 명령어**:
+```bash
+# 전체 테스트 (API 제외)
+uv run pytest tests/ -v -m "not api"
+
+# 커버리지 포함
+uv run pytest tests/ --cov=utils --cov-report=term-missing
+
+# 리포트 생성
+uv run python scripts/generate_test_report.py
+```
+
+---
+
 ## 기술 스택 요약
 
 ### 데이터 분석
@@ -328,22 +482,33 @@ Summary: START → chatbot ↔ tools → summarizer → END
 ### 개발 방법론
 - SDD (Spec-Driven Development)
 - GitHub Speckit (spec.md, plan.md, tasks.md)
+- TDD (Test-Driven Development)
 - Claude Code
+
+### 테스트
+- pytest, pytest-cov
+- pytest 마커 (@pytest.mark.api, slow, integration)
 
 ---
 
 ## 최종 산출물
 
-1. **Streamlit 데이터 시각화 앱 (v1.1.3)**
+1. **Streamlit 데이터 시각화 앱 (v2.0.1)**
    - CSV 파일 업로드 지원
    - 수치형/범주형 자동 분류 및 시각화
    - Folium 지도 시각화
-   - AI 챗봇 (Tool Calling 기반 20개 분석 도구)
+   - AI 챗봇 (LangGraph 기반 22개 분석 도구)
+   - ECLO 예측 기능 (대화형 모델 실행)
+   - Streamlit Cloud 배포
 
 2. **AI 에이전트 프로토타입**
    - 메모리 관리 (Buffer, Window, Summary)
    - Tool Calling 통합
    - 자연어 기반 데이터 분석
+
+3. **테스트 코드 및 TDD 체계**
+   - pytest 마커 기반 테스트 분류
+   - 테스트 리포트 자동 생성
 
 ---
 
@@ -358,6 +523,7 @@ Summary: START → chatbot ↔ tools → summarizer → END
 | 13일차 | `material/13/` |
 | 14일차 | `material/14/` |
 | 15일차 | `material/15/` |
+| 16~20일차 | `material/16-20/` |
 
 ---
 
@@ -370,3 +536,5 @@ Summary: START → chatbot ↔ tools → summarizer → END
 - [LangChain 문서](https://python.langchain.com/)
 - [LangGraph 문서](https://langchain-ai.github.io/langgraph/)
 - [GitHub Speckit](https://github.com/github/spec-kit)
+- [uv 문서](https://docs.astral.sh/uv/)
+- [pytest 문서](https://docs.pytest.org/)
