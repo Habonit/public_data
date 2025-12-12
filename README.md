@@ -850,13 +850,13 @@ public_data/
 | `specs/004-app-v12-upgrade/` | v1.2 스펙 산출물 (LangGraph, ECLO 예측) |
 | `specs/005-v1-3-deploy-prep/` | v1.3 스펙 산출물 (Streamlit 배포 준비) |
 | `material/` | 일차별 학습 자료 (아래 참조) |
-| `material/syllabus.md` | 전체 15일 커리큘럼 문서 |
+| `material/syllabus.md` | 전체 20일 커리큘럼 문서 |
 
 ---
 
 ## 학습 자료 (material/)
 
-15일 교육과정의 일차별 학습 자료입니다. 전체 커리큘럼은 `material/syllabus.md`를 참조하세요.
+20일 교육과정의 일차별 학습 자료입니다. 전체 커리큘럼은 `material/syllabus.md`를 참조하세요.
 
 ### 커리큘럼 개요
 
@@ -864,6 +864,7 @@ public_data/
 Phase 1: 데이터 분석 기초 (1~4일차)
 Phase 2: Streamlit 앱 개발 (5~10일차)
 Phase 3: AI 챗봇 통합 (11~15일차)
+Phase 4: 고도화 및 TDD (16~20일차)
 ```
 
 ### 일차별 학습 내용
@@ -877,12 +878,13 @@ Phase 3: AI 챗봇 통합 (11~15일차)
 | `material/13/` | 13일차 | Anthropic Tool Calling (정의, 실행, 다중 도구) |
 | `material/14/` | 14일차 | LangGraph 대화 메모리 (Buffer, Window, Summary, Hybrid) |
 | `material/15/` | 15일차 | LangGraph 메모리 + Tool Calling 통합 |
+| `material/16-20/` | 16~20일차 | LangGraph 전환, ECLO 예측, Streamlit 배포, TDD 적용 |
 
 ### 학습 흐름
 
 ```
-[데이터 분석 기초] → [Streamlit 앱 개발] → [AI 챗봇 통합]
-      ↓                    ↓                    ↓
-  CSV 분석            시각화 앱            Tool Calling
-  EDA, 모델          Plotly, Folium       LangGraph 메모리
+[데이터 분석 기초] → [Streamlit 앱 개발] → [AI 챗봇 통합] → [고도화 및 TDD]
+      ↓                    ↓                    ↓                 ↓
+  CSV 분석            시각화 앱            Tool Calling      pytest, 커버리지
+  EDA, 모델          Plotly, Folium       LangGraph 메모리   LangGraph, 배포
 ```
